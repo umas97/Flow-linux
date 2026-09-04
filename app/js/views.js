@@ -114,6 +114,71 @@
       '</div>';
   };
 
+  /* ------------------------------------------------------------------ *
+   * Ordinamento delle sezioni
+   * ------------------------------------------------------------------ */
+
+  /* Criteri nell'ordine in cui compaiono nel menu. "short" è l'etichetta
+     mostrata sul pulsante quando il criterio non è Manuale. */
+  V.SORTS = [
+    { key: 'manual', label: 'Manuale', short: '', ic: 'grip' },
+    { key: 'priority', label: 'Urgenza', short: 'Urgenza', ic: 'flag' },
+    { key: 'due', label: 'Scadenza più vicina', short: 'Scadenza', ic: 'calendar' },
+    { key: 'created-desc', label: 'Aggiunte di recente', short: 'Recenti', ic: 'sparkles' },
+    { key: 'created-asc', label: 'Aggiunte meno di recente', short: 'Meno recenti', ic: 'clock' },
+    { key: 'updated', label: 'Ultima modifica', short: 'Modifica', ic: 'edit' },
+    { key: 'alpha', label: 'Alfabetico A→Z', short: 'A→Z', ic: 'sortAz' }
+  ];
+
+  V.sortInfo = function (key) {
+    return V.SORTS.filter(function (s) { return s.key === key; })[0] || V.SORTS[0];
+  };
+
+  function cmpStr(x, y) {
+    x = x || ''; y = y || '';
+    return x < y ? -1 : x > y ? 1 : 0;
+  }
+
+  // Senza scadenza in fondo, in tutti i criteri che guardano le date.
+  function byDue(a, b) {
+    if (!a.due && !b.due) return 0;
+    if (!a.due) return 1;
+    if (!b.due) return -1;
+    return cmpStr(a.due, b.due);
+  }
+
+  var CMP = {
+    manual: function () { return 0; },
+    priority: function (a, b) { return (b.priority - a.priority) || byDue(a, b); },
+    due: byDue,
+    'created-desc': function (a, b) { return cmpStr(b.createdAt, a.createdAt); },
+    'created-asc': function (a, b) { return cmpStr(a.createdAt, b.createdAt); },
+    updated: function (a, b) { return cmpStr(b.updatedAt, a.updatedAt); },
+    // Naturale e insensibile agli accenti: "È ora" sta accanto a "e ora".
+    alpha: function (a, b) {
+      return a.title.localeCompare(b.title, 'it', { sensitivity: 'base', numeric: true });
+    }
+  };
+
+  /* Unico punto che ordina le attività di una sezione. Le completate restano
+     sempre in fondo in ogni criterio, e "order" chiude i pareggi: così l'esito
+     è sempre lo stesso a parità di dati. */
+  V.sortTasks = function (list, sort) {
+    var by = CMP[sort] || CMP.manual;
+    return list.slice().sort(function (a, b) {
+      return (a.done - b.done) || by(a, b) || (a.order - b.order);
+    });
+  };
+
+  /** Selettore dell'ordinamento nella testata di sezione. */
+  function sortBtn(s) {
+    var info = V.sortInfo(s.sort);
+    var on = info.key !== 'manual';
+    return '<button class="sort-btn' + (on ? ' on' : '') + '" data-act="section-sort" data-id="' + s.id +
+      '" title="Ordinamento: ' + U.esc(info.label) + '">' + icon(info.ic, 'sm') +
+      (on ? '<span>' + U.esc(info.short) + '</span>' : '') + '</button>';
+  }
+
   function emptyState(iconName, title, text) {
     return '<div class="empty">' + icon(iconName) + '<h3>' + U.esc(title) + '</h3><p>' + text + '</p></div>';
   }
@@ -282,12 +347,12 @@
     var sections = p.sections.slice().sort(function (a, b) { return a.order - b.order; });
 
     var cols = sections.map(function (s) {
-      var list = all.filter(function (t) { return t.sectionId === s.id; })
-        .sort(function (a, b) { return (a.done - b.done) || (a.order - b.order); });
+      var list = V.sortTasks(all.filter(function (t) { return t.sectionId === s.id; }), s.sort);
       return '<section class="column" data-section="' + s.id + '">' +
         '<div class="col-head">' +
         '<input class="col-name" value="' + U.esc(s.name) + '" data-act="rename-section" data-id="' + s.id + '">' +
         '<span class="col-count">' + list.length + '</span>' +
+        sortBtn(s) +
         '<button class="icon-btn tiny" data-act="section-menu" data-id="' + s.id + '">' + icon('more') + '</button>' +
         '</div>' +
         '<div class="col-body' + (list.length ? '' : ' is-empty') + '" data-drop="' + s.id + '">' +
@@ -309,12 +374,12 @@
     var sections = p.sections.slice().sort(function (a, b) { return a.order - b.order; });
 
     var html = sections.map(function (s) {
-      var list = all.filter(function (t) { return t.sectionId === s.id; })
-        .sort(function (a, b) { return (a.done - b.done) || (a.order - b.order); });
+      var list = V.sortTasks(all.filter(function (t) { return t.sectionId === s.id; }), s.sort);
       return '<section class="list-section" data-section="' + s.id + '">' +
         '<div class="list-sec-head">' +
         '<input class="col-name" value="' + U.esc(s.name) + '" data-act="rename-section" data-id="' + s.id + '" style="flex:0 1 auto;font-size:12.5px;font-weight:700">' +
         '<span class="col-count">' + list.length + '</span>' +
+        sortBtn(s) +
         '<button class="icon-btn tiny" data-act="section-menu" data-id="' + s.id + '">' + icon('more') + '</button>' +
         '</div>' +
         '<div class="drop-zone' + (list.length ? '' : ' is-empty') + '" data-drop="' + s.id + '">' +

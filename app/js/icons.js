@@ -38,6 +38,7 @@
     sparkles: '<path d="M12 3l1.7 4.3L18 9l-4.3 1.7L12 15l-1.7-4.3L6 9l4.3-1.7z"/><path d="M18.5 14.5l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8zM5.5 15.5l.6 1.5 1.5.6-1.5.6-.6 1.5-.6-1.5L3.4 17.6l1.5-.6z"/>',
     alert: '<path d="M12 4.5l9 15.5H3z"/><path d="M12 10v4M12 17h.01"/>',
     arrowRight: '<path d="M5 12h13M13 6l6 6-6 6"/>',
+    sortAz: '<path d="M4 7h9M4 12h6M4 17h3"/><path d="M17 5v13M20.5 14.5L17 18l-3.5-3.5"/>',
     grip: '<circle cx="9" cy="6" r="1.3"/><circle cx="15" cy="6" r="1.3"/><circle cx="9" cy="12" r="1.3"/><circle cx="15" cy="12" r="1.3"/><circle cx="9" cy="18" r="1.3"/><circle cx="15" cy="18" r="1.3"/>',
     chart: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
     layers: '<path d="M12 3l9 5-9 5-9-5z"/><path d="M3.5 12.5L12 17l8.5-4.5M3.5 16.5L12 21l8.5-4.5"/>',

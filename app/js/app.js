@@ -963,7 +963,7 @@
         var sid = U.uid('s');
         Store.commit('nuova sezione', function () {
           var max = pr.sections.reduce(function (m, s) { return Math.max(m, s.order); }, 0);
-          pr.sections.push({ id: sid, name: 'Nuova sezione', order: max + 1000 });
+          pr.sections.push({ id: sid, name: 'Nuova sezione', order: max + 1000, sort: 'manual' });
         });
         App.render();
         var input = U.$('[data-act="rename-section"][data-id="' + sid + '"]');
@@ -973,6 +973,9 @@
 
       case 'section-menu':
         return openSectionMenu(el, id);
+
+      case 'section-sort':
+        return openSortMenu(el, id);
 
       case 'project-menu':
         return openProjectMenu(el, currentProject());
@@ -1082,6 +1085,26 @@
       }
     });
     Menu.open(anchor, items, { alignRight: true });
+  }
+
+  /* L'ordinamento di una sezione finisce nell'archivio e nella cronologia
+     annulla/ripristina: è una scelta di contenuto, non una preferenza
+     d'interfaccia. */
+  function openSortMenu(anchor, sectionId) {
+    var p = currentProject();
+    if (!p) return;
+    var s = Store.section(p.id, sectionId);
+    if (!s) return;
+    Menu.open(anchor, [{ head: 'Ordina la sezione' }].concat(Views.SORTS.map(function (o) {
+      return {
+        label: o.label, ic: o.ic, on: (s.sort || 'manual') === o.key,
+        onClick: function () {
+          if ((s.sort || 'manual') === o.key) return;
+          Store.commit('ordinamento sezione', function () { s.sort = o.key; });
+          App.render();
+        }
+      };
+    })), { alignRight: true });
   }
 
   function openSectionMenu(anchor, sectionId) {
@@ -1288,6 +1311,13 @@
     return host ? U.$('[data-drop]', host) : null;
   }
 
+  /** Vero se la sezione della zona ha un ordinamento diverso da Manuale. */
+  function isSorted(zone) {
+    var p = currentProject();
+    var s = p && Store.section(p.id, zone.dataset.drop);
+    return !!(s && s.sort && s.sort !== 'manual');
+  }
+
   function afterElement(container, y) {
     var els = U.$$('[data-task]:not(.dragging)', container);
     var best = null, bestDist = -Infinity;
@@ -1328,8 +1358,9 @@
     drag.afterId = after ? after.dataset.task : null;
 
     // In una sezione vuota il riquadro tratteggiato dice già dove si finisce:
-    // la linea di inserimento lo spezzerebbe in due.
-    if (zone.classList.contains('is-empty')) {
+    // la linea di inserimento lo spezzerebbe in due. In una sezione ordinata
+    // prometterebbe una posizione che il criterio non rispetterà.
+    if (zone.classList.contains('is-empty') || isSorted(zone)) {
       if (drag.line) { drag.line.remove(); drag.line = null; }
     } else {
       if (!drag.line) drag.line = U.el('div', { class: 'drop-line' });

@@ -120,6 +120,10 @@
 
   /* ---------------------------- normalizzazione ---------------------------- */
 
+  /* Deve restare allineato a Views.SORTS: store.js è caricato prima di views.js,
+     quindi normalize non può leggere l'elenco da là. */
+  var SECTION_SORTS = ['manual', 'priority', 'due', 'created-desc', 'created-asc', 'updated', 'alpha'];
+
   function normalize(data) {
     var d = data && typeof data === 'object' ? data : {};
     var n = new Date().toISOString();
@@ -147,6 +151,9 @@
       p.sections.forEach(function (s, i) {
         s.id = s.id || U.uid('s');
         if (typeof s.order !== 'number') s.order = (i + 1) * 1000;
+        // Un criterio sconosciuto (archivio di una versione più nuova, o scritto
+        // a mano) torna a Manuale invece di far sparire le attività.
+        if (SECTION_SORTS.indexOf(s.sort) < 0) s.sort = 'manual';
       });
       if (!p.view) p.view = 'board';
       if (!p.createdAt) p.createdAt = n;

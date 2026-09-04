@@ -18,7 +18,7 @@ Legenda stato: `da fare` · `in corso` · `fatto` · `rimandato`
 | 4 | 2 | Sposta sezione a destra / sinistra | fatto | `app.js`, `detail.js`, `icons.js`, `styles.css` |
 | 5 | 4 | Sotto-attività a capo automatico | fatto | `detail.js`, `styles.css` |
 | 6 | 8 | Trascinamento attività (riordino e cambio sezione) | fatto | `app.js`, `views.js`, `styles.css` |
-| 7 | 6 | Ordinamenti per sezione | da fare | `views.js`, `app.js`, `store.js`, `styles.css`, `README.md` |
+| 7 | 6 | Ordinamenti per sezione | fatto | `views.js`, `app.js`, `store.js`, `icons.js`, `styles.css`, `README.md` |
 | 8 | 5 | Riordino dei progetti + lucchetto | da fare | `views.js`, `app.js`, `store.js`, `index.html`, `styles.css` |
 | 9 | 1 | Sezione Note per progetto con collegamenti a cartelle | da fare | `src/Flow.cs`, `views.js`, `app.js`, `store.js`, `styles.css`, `README.md` |
 | 10 | 9 | Ripulitura dei dati personali + git | da fare | `data/`, `dist/`, `.gitignore`, `README.md` |
@@ -479,7 +479,7 @@ inferiore di una lista lunga e verso il bordo destro della bacheca.
 ## Fase 7 · Ordinamenti per sezione
 <sub>richiesta 6</sub>
 
-**Stato:** da fare
+**Stato:** fatto
 
 ### Decisioni prese
 - Il selettore sta **in alto su ogni sezione**, accanto al contatore, sia in bacheca sia in
@@ -515,6 +515,41 @@ inferiore di una lista lunga e verso il bordo destro della bacheca.
 5. In vista elenco, con ordinamento non manuale, le righe restano trascinabili solo verso
    altre sezioni (vedi fase 6, punto 7 del piano).
 6. Aggiornare [README.md](README.md) con la tabella dei criteri.
+
+### Fatto
+- `Views.SORTS` ([views.js:125](app/js/views.js#L125)): i sette criteri con etichetta,
+  etichetta breve e icona, nell'ordine del menu. `Views.sortInfo(key)` risolve un criterio
+  ignoto su Manuale.
+- `Views.sortTasks(list, sort)` ([views.js:166](app/js/views.js#L166)) è l'unico punto che
+  ordina: `(a.done - b.done)` come primo criterio, poi il comparatore scelto, poi `order`
+  come spareggio — così a parità di dati l'esito è sempre lo stesso. `V.board` e `V.list`
+  hanno perso il loro `.sort()` in linea.
+- Comparatori: `priority` scende dalla priorità alta e a pari priorità usa la scadenza;
+  `byDue` mette sempre le attività senza scadenza in fondo; le date sono stringhe
+  `YYYY-MM-DD` e `createdAt`/`updatedAt` stringhe ISO, quindi il confronto lessicografico
+  basta; `alpha` usa `localeCompare(…, 'it', { sensitivity: 'base', numeric: true })`.
+- Pulsante nella testata di sezione (`sortBtn`, [views.js:174](app/js/views.js#L174)):
+  in bacheca e in vista elenco, accanto al contatore. Con Manuale mostra solo l'icona,
+  smorzata e piena all'hover; con un criterio attivo aggiunge l'etichetta breve e prende
+  il colore d'accento. Icona nuova `sortAz` in [icons.js:41](app/js/icons.js#L41).
+- `openSortMenu` ([app.js:1130](app/js/app.js#L1130)) con intestazione “Ordina la sezione”
+  e la spunta sul criterio attivo; scrive con `Store.commit('ordinamento sezione', …)`,
+  quindi la scelta va nell'archivio e nella cronologia annulla/ripristina.
+- `normalize()`: `SECTION_SORTS` in [store.js](app/js/store.js) (elenco duplicato di
+  proposito — `store.js` è caricato prima di `views.js` e non può leggerlo da `Views`) e
+  un criterio sconosciuto torna a `manual` invece di far sparire le attività. Le sezioni
+  create da `add-section` nascono già con `sort: 'manual'`.
+- **Ritocco alla fase 6:** in una sezione con un criterio attivo il trascinamento non
+  disegna più la linea di inserimento (`isSorted(zone)` in
+  [app.js:1296](app/js/app.js#L1296)): prometterebbe una posizione che il criterio non
+  rispetterà. L'avviso al rilascio resta.
+- README: tabella dei criteri, nota sulle completate sempre in fondo e sulle viste
+  trasversali non interessate.
+
+### Non verificato a mano
+Come per la fase 6, la logica è stata ricontrollata leggendola ma il pulsante e il menu
+vanno guardati a schermo — in particolare l'ingombro della testata in vista elenco, dove
+il nome della sezione, il contatore, il selettore e il `…` stanno tutti in fila.
 
 ---
 

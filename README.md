@@ -95,10 +95,32 @@ Da **Impostazioni → Apri cartella** arrivi al file in due clic.
 - **Oggi** — cruscotto con attività in ritardo, di oggi, dei prossimi 7 giorni,
   statistiche e andamento delle ultime settimane.
 - **Bacheca** — colonne in stile kanban, con trascinamento tra le sezioni.
-- **Elenco** — righe compatte raggruppate per sezione, riordinabili.
+- **Elenco** — righe compatte raggruppate per sezione, riordinabili con il
+  trascinamento.
 - **Calendario** — mese intero; trascina un'attività su un altro giorno per
   spostarne la scadenza.
 - **Prossimi 7 giorni**, **Tutte le attività**, **Completate**.
+
+**Ordinamento delle sezioni**
+
+Ogni sezione ha il suo criterio, scelto col pulsante accanto al contatore (in
+bacheca e in vista elenco) e ricordato nell'archivio:
+
+| Criterio | Cosa fa |
+|----------|---------|
+| **Manuale** | l'ordine che scrivi trascinando — è il valore predefinito |
+| **Urgenza** | priorità alta prima; a pari priorità, scadenza più vicina |
+| **Scadenza più vicina** | date crescenti, senza scadenza in fondo |
+| **Aggiunte di recente** | dalla più nuova alla più vecchia |
+| **Aggiunte meno di recente** | dalla più vecchia alla più nuova |
+| **Ultima modifica** | modificate per ultime in cima |
+| **Alfabetico A→Z** | per titolo, senza distinzione di accenti e maiuscole |
+
+Le attività completate restano in fondo con ogni criterio. In una sezione con un
+criterio attivo il riordino a mano non ha effetto: trascinandoci dentro
+un'attività la sposti di sezione, ma il posto lo decide il criterio. Le viste
+*Oggi*, *Prossimi 7 giorni*, *Tutte* e *Completate* hanno il loro ordinamento
+per data e non sono interessate.
 
 **Attività**
 

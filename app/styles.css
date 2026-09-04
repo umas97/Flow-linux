@@ -481,6 +481,18 @@ html[data-theme="dark"] .theme-opt.active { background: var(--surface-hover); }
 }
 .col-name:focus { outline: 2px solid var(--accent); background: var(--surface); }
 .col-count { font-size: 11px; font-weight: 650; color: var(--text-3); background: var(--surface); border: 1px solid var(--border); padding: 0 6px; border-radius: 20px; }
+
+/* Selettore dell'ordinamento: solo l'icona quando è Manuale, icona più
+   etichetta breve quando un criterio è attivo. */
+.sort-btn {
+  display: inline-flex; align-items: center; gap: 4px;
+  height: 22px; padding: 0 5px; border-radius: 7px;
+  font-size: 11px; font-weight: 650; color: var(--text-3);
+  opacity: .55; transition: all .14s;
+}
+.column:hover .sort-btn, .list-section:hover .sort-btn { opacity: 1; }
+.sort-btn:hover { background: var(--surface-hover); color: var(--text); }
+.sort-btn.on { opacity: 1; color: var(--accent-text); background: var(--accent-soft); }
 .col-body { padding: 0 10px 10px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; flex: 1; min-height: 20px; }
 .col-add {
   margin: 0 10px 10px; height: 32px; border-radius: 9px;
