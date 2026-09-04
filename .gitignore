@@ -1,0 +1,13 @@
+# Archivio dell'utente: board, backup, log, geometria della finestra
+# e cache del WebView2. Solo la cartella resta nel repository.
+data/*
+!data/.gitkeep
+
+# Pacchetti rilasciati
+dist/
+
+# Windows: i collegamenti .lnk incorporano percorsi e nome della macchina
+*.lnk
+*.pdb
+Thumbs.db
+desktop.ini

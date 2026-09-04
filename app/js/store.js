@@ -1,0 +1,479 @@
+/* Store: stato applicativo, persistenza su file locale, cronologia annulla/ripristina. */
+(function (global) {
+  'use strict';
+
+  var U = global.U;
+  var SCHEMA = 1;
+
+  /* ------------------------------------------------------------------ *
+   * Backend di persistenza
+   *  - "server": servito da Flow.exe -> scrive su data/board.json
+   *  - "local" : aperto con doppio clic su index.html -> localStorage
+   *
+   * Il nome "server" è rimasto per comodità: dietro non c'è più un server,
+   * ma l'host nativo che risponde alle stesse chiamate /api/ restando
+   * dentro il processo dell'applicazione.
+   * ------------------------------------------------------------------ */
+  var isServed = location.protocol === 'http:' || location.protocol === 'https:';
+  var BACKEND = isServed ? 'server' : 'local';
+  var LS_KEY = 'flow.board';
+  var LS_PREFS = 'flow.prefs';
+
+  var listeners = [];
+  var undoStack = [];
+  var redoStack = [];
+  var MAX_UNDO = 60;
+
+  var Store = {
+    state: null,
+    backend: BACKEND,
+    saveStatus: 'idle', // idle | dirty | saving | saved | error
+    lastError: null
+  };
+
+  /* ---------------------------- dati iniziali ---------------------------- */
+
+  function seed() {
+    var t = U.today();
+    var pid = 'p_welcome', pid2 = 'p_casa';
+    var s1 = 's_todo', s2 = 's_doing', s3 = 's_done';
+    var n = new Date().toISOString();
+
+    function task(o) {
+      return Object.assign({
+        id: U.uid('t'), projectId: pid, sectionId: s1, title: '', notes: '',
+        done: false, completedAt: null, due: null, priority: 0, tags: [],
+        assignee: null, subtasks: [], order: 0, createdAt: n, updatedAt: n
+      }, o);
+    }
+
+    return {
+      schema: SCHEMA,
+      createdAt: n,
+      settings: { theme: 'system', accent: '#6d5efc', density: 'comfortable', startView: 'today' },
+      people: [
+        { id: 'me', name: 'Io', color: '#6d5efc' }
+      ],
+      tags: [
+        { id: 'tg_urgente', name: 'urgente', color: '#ef4444' },
+        { id: 'tg_idea', name: 'idea', color: '#f59e0b' },
+        { id: 'tg_casa', name: 'casa', color: '#10b981' }
+      ],
+      projects: [
+        {
+          id: pid, name: 'Benvenuto in Flow', color: '#6d5efc', icon: '🚀',
+          archived: false, view: 'board', createdAt: n,
+          sections: [
+            { id: s1, name: 'Da fare', order: 1000 },
+            { id: s2, name: 'In corso', order: 2000 },
+            { id: s3, name: 'Fatto', order: 3000 }
+          ]
+        },
+        {
+          id: pid2, name: 'Casa', color: '#10b981', icon: '🏡',
+          archived: false, view: 'list', createdAt: n,
+          sections: [
+            { id: 's_casa1', name: 'Questa settimana', order: 1000 },
+            { id: 's_casa2', name: 'Prima o poi', order: 2000 }
+          ]
+        }
+      ],
+      tasks: [
+        task({
+          title: 'Premi N per creare la tua prima attività', sectionId: s1, order: 1000,
+          priority: 3, due: t, tags: ['tg_urgente'], assignee: 'me',
+          notes: 'La casella di inserimento rapido capisce il linguaggio naturale.\n\nProva a scrivere:\n\n`Chiamare il commercialista domani !alta #urgente @Io`\n\n- **domani / lunedì / 12/03** → scadenza\n- **!alta !media !bassa** → priorità\n- **#etichetta** → etichetta\n- **@persona** → assegnatario',
+          subtasks: [
+            { id: U.uid('st'), title: 'Scrivi il titolo', done: true },
+            { id: U.uid('st'), title: 'Aggiungi una scadenza', done: false },
+            { id: U.uid('st'), title: 'Trascinala in un\'altra colonna', done: false }
+          ]
+        }),
+        task({
+          title: 'Trascina le schede tra le colonne', sectionId: s1, order: 2000,
+          priority: 2, due: U.addDays(t, 1),
+          notes: 'Puoi trascinare le attività tra le sezioni della bacheca, riordinarle nella vista elenco e spostarle di giorno nel calendario.'
+        }),
+        task({
+          title: 'Ctrl+K apre la palette dei comandi', sectionId: s2, order: 1000,
+          priority: 1, tags: ['tg_idea'],
+          notes: 'Cerca qualsiasi attività o progetto, oppure lancia un comando: cambia tema, esporta i dati, crea un progetto.'
+        }),
+        task({
+          title: 'Tutto è salvato in data/board.json', sectionId: s2, order: 2000,
+          notes: 'Nessun account, nessuna rete. Il file resta sul tuo disco e viene salvato automaticamente a ogni modifica, con backup a rotazione in `data/backups/`.',
+          subtasks: [
+            { id: U.uid('st'), title: 'Esporta una copia quando vuoi', done: false }
+          ]
+        }),
+        task({
+          title: 'Tema chiaro, scuro o automatico', sectionId: s3, order: 1000,
+          done: true, completedAt: n,
+          notes: 'Il selettore è in basso nella barra laterale. "Auto" segue le impostazioni di Windows.'
+        }),
+        task({ title: 'Fare la spesa', projectId: pid2, sectionId: 's_casa1', order: 1000, due: t, tags: ['tg_casa'], priority: 2 }),
+        task({ title: 'Prenotare il tagliando dell\'auto', projectId: pid2, sectionId: 's_casa1', order: 2000, due: U.addDays(t, 3) }),
+        task({ title: 'Riordinare il garage', projectId: pid2, sectionId: 's_casa2', order: 1000, tags: ['tg_casa'] })
+      ]
+    };
+  }
+
+  /* ---------------------------- normalizzazione ---------------------------- */
+
+  function normalize(data) {
+    var d = data && typeof data === 'object' ? data : {};
+    var n = new Date().toISOString();
+
+    d.schema = SCHEMA;
+    d.settings = Object.assign({
+      theme: 'system', accent: '#6d5efc', density: 'comfortable',
+      startView: 'today', sidebarCollapsed: false, detailWidth: 440, detailAutoHide: true
+    }, d.settings || {});
+    // Larghezza del pannello dettagli: numero entro i limiti della maniglia.
+    var dw = +d.settings.detailWidth;
+    d.settings.detailWidth = isNaN(dw) ? 440 : Math.max(320, Math.min(720, Math.round(dw)));
+    // Chiusura al click fuori: acceso salvo esplicito "false".
+    d.settings.detailAutoHide = d.settings.detailAutoHide !== false;
+    d.people = Array.isArray(d.people) ? d.people : [];
+    d.tags = Array.isArray(d.tags) ? d.tags : [];
+    d.projects = Array.isArray(d.projects) ? d.projects : [];
+    d.tasks = Array.isArray(d.tasks) ? d.tasks : [];
+
+    d.projects.forEach(function (p) {
+      p.id = p.id || U.uid('p');
+      p.name = p.name || 'Progetto';
+      p.color = p.color || '#6d5efc';
+      p.sections = Array.isArray(p.sections) && p.sections.length ? p.sections : [{ id: U.uid('s'), name: 'Da fare', order: 1000 }];
+      p.sections.forEach(function (s, i) {
+        s.id = s.id || U.uid('s');
+        if (typeof s.order !== 'number') s.order = (i + 1) * 1000;
+      });
+      if (!p.view) p.view = 'board';
+      if (!p.createdAt) p.createdAt = n;
+    });
+
+    var validProjects = {};
+    d.projects.forEach(function (p) { validProjects[p.id] = p; });
+
+    d.tasks.forEach(function (t, i) {
+      t.id = t.id || U.uid('t');
+      t.title = t.title || '(senza titolo)';
+      t.notes = t.notes || '';
+      t.done = !!t.done;
+      t.priority = typeof t.priority === 'number' ? t.priority : 0;
+      t.tags = Array.isArray(t.tags) ? t.tags : [];
+      t.subtasks = Array.isArray(t.subtasks) ? t.subtasks : [];
+      t.subtasks.forEach(function (s) { s.id = s.id || U.uid('st'); s.done = !!s.done; });
+      if (typeof t.order !== 'number') t.order = (i + 1) * 1000;
+      if (!t.createdAt) t.createdAt = n;
+      if (!t.updatedAt) t.updatedAt = t.createdAt;
+      if (t.done && !t.completedAt) t.completedAt = t.updatedAt;
+      if (!t.done) t.completedAt = null;
+
+      // Ripara riferimenti orfani: l'attività finisce nel primo progetto/sezione valido.
+      var p = validProjects[t.projectId];
+      if (!p) { p = d.projects[0]; t.projectId = p ? p.id : null; }
+      if (p && !p.sections.some(function (s) { return s.id === t.sectionId; })) {
+        t.sectionId = p.sections[0].id;
+      }
+    });
+
+    var tagIds = {};
+    d.tags.forEach(function (g) { g.id = g.id || U.uid('tg'); tagIds[g.id] = true; });
+    d.tasks.forEach(function (t) {
+      t.tags = t.tags.filter(function (id) { return tagIds[id]; });
+    });
+
+    return d;
+  }
+
+  /* ---------------------------- I/O ---------------------------- */
+
+  function loadPrefs() {
+    try { return JSON.parse(localStorage.getItem(LS_PREFS) || '{}'); } catch (e) { return {}; }
+  }
+
+  function savePrefs() {
+    var s = Store.state && Store.state.settings;
+    if (!s) return;
+    try {
+      localStorage.setItem(LS_PREFS, JSON.stringify({ theme: s.theme, accent: s.accent, density: s.density }));
+    } catch (e) {}
+  }
+
+  Store.load = function () {
+    if (BACKEND === 'server') {
+      return fetch('/api/data', { cache: 'no-store' })
+        .then(function (r) {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.json();
+        })
+        .then(function (json) {
+          var fresh = !(json && json.schema);
+          Store.state = normalize(fresh ? seed() : json);
+          savePrefs();
+          if (fresh) flush(); // primo avvio: creo subito board.json sul disco
+          return Store.state;
+        })
+        .catch(function (err) {
+          // Il server non risponde: si continua in sola memoria, senza perdere dati sul disco.
+          Store.lastError = err;
+          Store.backend = 'memory';
+          Store.state = normalize(readLocal() || seed());
+          return Store.state;
+        });
+    }
+    Store.state = normalize(readLocal() || seed());
+    savePrefs();
+    return Promise.resolve(Store.state);
+  };
+
+  function readLocal() {
+    try {
+      var raw = localStorage.getItem(LS_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) { return null; }
+  }
+
+  function writeLocal() {
+    try {
+      localStorage.setItem(LS_KEY, JSON.stringify(Store.state));
+      return true;
+    } catch (e) { return false; }
+  }
+
+  function setStatus(s) {
+    Store.saveStatus = s;
+    emit('status');
+  }
+
+  var flushing = false, pendingAgain = false;
+
+  function flush() {
+    if (!Store.state) return;
+    if (flushing) { pendingAgain = true; return; }
+
+    savePrefs();
+
+    if (Store.backend !== 'server') {
+      writeLocal();
+      setStatus('saved');
+      return;
+    }
+
+    flushing = true;
+    setStatus('saving');
+    // Indentato di proposito: board.json è pensato per restare leggibile a occhio.
+    fetch('/api/data', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(Store.state, null, 2)
+    }).then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      setStatus('saved');
+    }).catch(function (err) {
+      Store.lastError = err;
+      writeLocal(); // rete locale caduta: copia di sicurezza nel browser
+      setStatus('error');
+    }).then(function () {
+      flushing = false;
+      if (pendingAgain) { pendingAgain = false; flush(); }
+    });
+  }
+
+  var scheduleSave = U.debounce(flush, 450);
+
+  /** Salvataggio sincrono di emergenza alla chiusura della finestra. */
+  Store.flushNow = function () {
+    if (!Store.state) return;
+    savePrefs();
+    writeLocal();
+    if (Store.backend === 'server' && navigator.sendBeacon) {
+      try {
+        navigator.sendBeacon('/api/data', new Blob([JSON.stringify(Store.state, null, 2)], { type: 'application/json' }));
+      } catch (e) {}
+    }
+  };
+
+  /* ---------------------------- mutazioni ---------------------------- */
+
+  function snapshot() { return JSON.stringify(Store.state); }
+
+  /**
+   * Unico punto di ingresso per modificare lo stato.
+   * `label` compare nel toast di annullamento.
+   */
+  Store.commit = function (label, fn, opts) {
+    var before = snapshot();
+    var result = fn(Store.state);
+    if (result === false) return false; // la mutazione si è annullata da sola
+
+    if (!(opts && opts.noUndo)) {
+      undoStack.push({ label: label, data: before });
+      if (undoStack.length > MAX_UNDO) undoStack.shift();
+      redoStack.length = 0;
+    }
+    setStatus('dirty');
+    scheduleSave();
+    emit('change', label);
+    return true;
+  };
+
+  /** Modifica senza cronologia (es. preferenze UI). */
+  Store.quiet = function (fn) {
+    fn(Store.state);
+    setStatus('dirty');
+    scheduleSave();
+    emit('change');
+  };
+
+  Store.canUndo = function () { return undoStack.length > 0; };
+  Store.canRedo = function () { return redoStack.length > 0; };
+
+  Store.undo = function () {
+    var entry = undoStack.pop();
+    if (!entry) return null;
+    redoStack.push({ label: entry.label, data: snapshot() });
+    Store.state = normalize(JSON.parse(entry.data));
+    setStatus('dirty');
+    scheduleSave();
+    emit('change', 'undo');
+    return entry.label;
+  };
+
+  Store.redo = function () {
+    var entry = redoStack.pop();
+    if (!entry) return null;
+    undoStack.push({ label: entry.label, data: snapshot() });
+    Store.state = normalize(JSON.parse(entry.data));
+    setStatus('dirty');
+    scheduleSave();
+    emit('change', 'redo');
+    return entry.label;
+  };
+
+  Store.replaceAll = function (data) {
+    undoStack.push({ label: 'importazione', data: snapshot() });
+    Store.state = normalize(data);
+    redoStack.length = 0;
+    setStatus('dirty');
+    flush();
+    emit('change', 'import');
+  };
+
+  /* ---------------------------- eventi ---------------------------- */
+
+  function emit(type, payload) {
+    listeners.forEach(function (l) { if (l.type === type) l.fn(payload); });
+  }
+
+  Store.on = function (type, fn) { listeners.push({ type: type, fn: fn }); };
+
+  /* ---------------------------- selettori ---------------------------- */
+
+  Store.project = function (id) {
+    return Store.state.projects.filter(function (p) { return p.id === id; })[0] || null;
+  };
+
+  Store.task = function (id) {
+    return Store.state.tasks.filter(function (t) { return t.id === id; })[0] || null;
+  };
+
+  Store.tag = function (id) {
+    return Store.state.tags.filter(function (g) { return g.id === id; })[0] || null;
+  };
+
+  Store.person = function (id) {
+    return Store.state.people.filter(function (p) { return p.id === id; })[0] || null;
+  };
+
+  Store.section = function (projectId, sectionId) {
+    var p = Store.project(projectId);
+    if (!p) return null;
+    return p.sections.filter(function (s) { return s.id === sectionId; })[0] || null;
+  };
+
+  Store.tasksOf = function (projectId) {
+    return Store.state.tasks.filter(function (t) { return t.projectId === projectId; });
+  };
+
+  Store.activeProjects = function () {
+    return Store.state.projects.filter(function (p) { return !p.archived; });
+  };
+
+  /** Progresso 0..1 di un progetto (attività completate / totali). */
+  Store.progress = function (projectId) {
+    var list = Store.tasksOf(projectId);
+    if (!list.length) return { done: 0, total: 0, ratio: 0 };
+    var done = list.filter(function (t) { return t.done; }).length;
+    return { done: done, total: list.length, ratio: done / list.length };
+  };
+
+  /* ---------------------------- azioni di dominio ---------------------------- */
+
+  Store.createTask = function (fields) {
+    var n = new Date().toISOString();
+    var projectId = fields.projectId || (Store.activeProjects()[0] || {}).id;
+    var p = Store.project(projectId);
+    var sectionId = fields.sectionId || (p && p.sections[0].id);
+
+    var siblings = Store.state.tasks.filter(function (t) {
+      return t.projectId === projectId && t.sectionId === sectionId;
+    });
+    var minOrder = siblings.reduce(function (m, t) { return Math.min(m, t.order); }, Infinity);
+
+    var task = Object.assign({
+      id: U.uid('t'), projectId: projectId, sectionId: sectionId,
+      title: 'Nuova attività', notes: '', done: false, completedAt: null,
+      due: null, priority: 0, tags: [], assignee: null, subtasks: [],
+      order: siblings.length ? minOrder - 1000 : 1000,
+      createdAt: n, updatedAt: n
+    }, fields);
+
+    Store.state.tasks.push(task);
+    return task;
+  };
+
+  Store.updateTask = function (id, patch) {
+    var t = Store.task(id);
+    if (!t) return null;
+    Object.assign(t, patch);
+    t.updatedAt = new Date().toISOString();
+    if ('done' in patch) t.completedAt = patch.done ? t.updatedAt : null;
+    return t;
+  };
+
+  Store.deleteTask = function (id) {
+    var i = Store.state.tasks.findIndex(function (t) { return t.id === id; });
+    if (i >= 0) Store.state.tasks.splice(i, 1);
+  };
+
+  Store.ensureTag = function (name) {
+    var clean = String(name).trim().toLowerCase().replace(/^#/, '');
+    if (!clean) return null;
+    var found = Store.state.tags.filter(function (g) { return g.name.toLowerCase() === clean; })[0];
+    if (found) return found;
+    var palette = ['#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
+    var tag = { id: U.uid('tg'), name: clean, color: palette[Store.state.tags.length % palette.length] };
+    Store.state.tags.push(tag);
+    return tag;
+  };
+
+  Store.ensurePerson = function (name) {
+    var clean = String(name).trim().replace(/^@/, '');
+    if (!clean) return null;
+    var found = Store.state.people.filter(function (p) {
+      return p.name.toLowerCase() === clean.toLowerCase();
+    })[0];
+    if (found) return found;
+    var person = { id: U.uid('pe'), name: clean, color: 'hsl(' + U.hashHue(clean) + ' 65% 55%)' };
+    Store.state.people.push(person);
+    return person;
+  };
+
+  Store.seedData = seed;
+  Store.normalize = normalize;
+  Store.loadPrefs = loadPrefs;
+
+  global.Store = Store;
+})(window);

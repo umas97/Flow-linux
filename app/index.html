@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="it" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flow</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%236d5efc'/%3E%3Cpath d='M9 16.5l5 5 9-10' stroke='white' stroke-width='3.2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="styles.css">
+<script>
+  // Applica il tema prima del primo paint: niente flash bianco all'avvio.
+  (function () {
+    try {
+      var s = JSON.parse(localStorage.getItem('flow.prefs') || '{}');
+      var t = s.theme || 'system';
+      var dark = t === 'dark' || (t === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
+      document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+      if (s.accent) document.documentElement.style.setProperty('--accent', s.accent);
+      if (s.density === 'compact') document.documentElement.dataset.density = 'compact';
+    } catch (e) {}
+  })();
+</script>
+</head>
+<body>
+
+<div id="splash">
+  <div class="splash-mark"></div>
+  <div class="splash-text">Flow</div>
+</div>
+
+<div id="app" class="app" aria-hidden="true">
+
+  <aside id="sidebar" class="sidebar">
+    <div class="side-brand">
+      <div class="brand-mark"></div>
+      <div class="brand-name">Flow</div>
+      <button class="icon-btn side-collapse" data-act="toggle-sidebar" title="Comprimi barra laterale (Ctrl+B)"></button>
+    </div>
+
+    <button class="new-task-btn" data-act="quick-add">
+      <span class="nt-plus"></span><span class="nt-label">Nuova attività</span>
+      <kbd class="nt-kbd">N</kbd>
+    </button>
+
+    <nav class="side-nav" id="sideNav"></nav>
+
+    <div class="side-group" id="projectsGroup">
+      <div class="side-group-head">
+        <button class="group-toggle" data-act="toggle-group" data-group="projects">
+          <span class="chev"></span><span>Progetti</span>
+        </button>
+        <button class="icon-btn tiny" data-act="new-project" title="Nuovo progetto"></button>
+      </div>
+      <ul class="side-list" id="projectList"></ul>
+    </div>
+
+    <div class="side-group" id="tagsGroup">
+      <div class="side-group-head">
+        <button class="group-toggle" data-act="toggle-group" data-group="tags">
+          <span class="chev"></span><span>Etichette</span>
+        </button>
+        <button class="icon-btn tiny" data-act="manage-tags" title="Gestisci etichette: crea, rinomina, elimina"></button>
+      </div>
+      <ul class="side-list tags" id="tagList"></ul>
+    </div>
+
+    <div class="side-foot">
+      <div class="theme-switch" id="themeSwitch" role="group" aria-label="Tema"></div>
+      <div class="foot-row">
+        <button class="foot-btn" data-act="settings" title="Impostazioni"></button>
+        <button class="foot-btn" data-act="help" title="Scorciatoie (?)"></button>
+        <div class="save-state" id="saveState" title="Stato salvataggio">
+          <span class="dot"></span><span class="save-label">Salvato</span>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar" id="topbar"></header>
+    <div class="content" id="content"></div>
+  </main>
+
+  <aside class="detail" id="detail" aria-hidden="true"></aside>
+  <div class="scrim" id="scrim" hidden></div>
+</div>
+
+<div id="palette" class="palette" hidden>
+  <div class="palette-box">
+    <div class="palette-input">
+      <span class="pi-icon"></span>
+      <input id="paletteInput" type="text" placeholder="Cerca attività, progetti o esegui un comando…" autocomplete="off" spellcheck="false">
+      <kbd>Esc</kbd>
+    </div>
+    <div class="palette-results" id="paletteResults"></div>
+    <div class="palette-foot">
+      <span><kbd>↑</kbd><kbd>↓</kbd> naviga</span>
+      <span><kbd>↵</kbd> apri</span>
+      <span><kbd>Ctrl</kbd>+<kbd>K</kbd> palette</span>
+    </div>
+  </div>
+</div>
+
+<div id="modal" class="modal" hidden></div>
+<div id="toasts" class="toasts"></div>
+
+<script src="js/icons.js"></script>
+<script src="js/util.js"></script>
+<script src="js/store.js"></script>
+<script src="js/parse.js"></script>
+<script src="js/views.js"></script>
+<script src="js/detail.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
