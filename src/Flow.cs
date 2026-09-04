@@ -472,6 +472,22 @@ namespace FlowApp
                             return;
                         }
 
+                    case "/api/pick":
+                        {
+                            if (method != "POST") { Reply(e, 405, "{\"error\":\"metodo non ammesso\"}"); return; }
+                            PickFromRequest(e, ReadBody(e).Trim());
+                            return;
+                        }
+
+                    case "/api/open":
+                        {
+                            if (method != "POST") { Reply(e, 405, "{\"error\":\"metodo non ammesso\"}"); return; }
+                            string problem;
+                            if (Reveal(ReadBody(e), out problem)) Reply(e, 200, "{\"ok\":true}");
+                            else Reply(e, 404, "{\"error\":" + Json.Str(problem) + "}");
+                            return;
+                        }
+
                     case "/api/quit":
                         Reply(e, 200, "{\"ok\":true}");
                         BeginInvoke((MethodInvoker)delegate { Close(); });
@@ -494,15 +510,17 @@ namespace FlowApp
             }
         }
 
+        private static string ReadBody(CoreWebView2WebResourceRequestedEventArgs e)
+        {
+            Stream content = e.Request.Content;
+            if (content == null) return "";
+            using (StreamReader reader = new StreamReader(content, new UTF8Encoding(false)))
+                return reader.ReadToEnd();
+        }
+
         private void SaveFromRequest(CoreWebView2WebResourceRequestedEventArgs e)
         {
-            string body = "";
-            Stream content = e.Request.Content;
-            if (content != null)
-            {
-                using (StreamReader reader = new StreamReader(content, new UTF8Encoding(false)))
-                    body = reader.ReadToEnd();
-            }
+            string body = ReadBody(e);
 
             if (!Accepts(body))
             {
@@ -513,6 +531,93 @@ namespace FlowApp
             Storage.Write(body);
             Reply(e, 200, "{\"ok\":true,\"bytes\":" +
                 Encoding.UTF8.GetByteCount(body).ToString(CultureInfo.InvariantCulture) + "}");
+        }
+
+        /* ------------------------- collegamenti a cartelle e file -------------------------
+           Due endpoint per la scheda Note dei progetti. Il corpo della richiesta e'
+           il percorso (o "dir"/"file") in chiaro, non un oggetto JSON: qui non c'e'
+           un interprete JSON, e scriverne uno per una stringa sola non ha senso. */
+
+        /// <summary>
+        /// Apre il selettore nativo di Windows. La risposta arriva a scelta
+        /// effettuata, quindi la richiesta viene messa in attesa con un deferral:
+        /// una finestra modale non si puo' aprire dentro il gestore dell'evento.
+        /// </summary>
+        private void PickFromRequest(CoreWebView2WebResourceRequestedEventArgs e, string kind)
+        {
+            CoreWebView2Deferral deferral = e.GetDeferral();
+            BeginInvoke((MethodInvoker)delegate
+            {
+                string json = "{\"cancelled\":true}";
+                try { json = Pick(kind); }
+                catch (Exception err) { Paths.Log("selettore non riuscito: " + err.Message); }
+                try { Reply(e, 200, json); }
+                catch (Exception err) { Paths.Log("risposta al selettore non riuscita: " + err.Message); }
+                finally { deferral.Complete(); }
+            });
+        }
+
+        private string Pick(string kind)
+        {
+            if (kind == "file")
+            {
+                using (OpenFileDialog dialog = new OpenFileDialog())
+                {
+                    dialog.Title = "Scegli un file da collegare";
+                    dialog.CheckFileExists = true;
+                    dialog.Multiselect = false;
+                    dialog.Filter = "Tutti i file (*.*)|*.*";
+                    if (dialog.ShowDialog(this) != DialogResult.OK) return "{\"cancelled\":true}";
+                    return "{\"path\":" + Json.Str(dialog.FileName) + "}";
+                }
+            }
+
+            using (FolderBrowserDialog dialog = new FolderBrowserDialog())
+            {
+                dialog.Description = "Scegli una cartella da collegare";
+                dialog.ShowNewFolderButton = false;
+                if (dialog.ShowDialog(this) != DialogResult.OK) return "{\"cancelled\":true}";
+                return "{\"path\":" + Json.Str(dialog.SelectedPath) + "}";
+            }
+        }
+
+        /// <summary>
+        /// Mostra un percorso nell'Esplora risorse. <b>Non esegue mai niente:</b>
+        /// un file viene solo evidenziato dentro la sua cartella, mai avviato.
+        /// Accetta unicamente percorsi assoluti che esistono davvero.
+        /// </summary>
+        private static bool Reveal(string raw, out string problem)
+        {
+            problem = null;
+            string wanted = (raw ?? "").Trim().Trim('"');
+            if (wanted.Length == 0) { problem = "percorso vuoto"; return false; }
+
+            string full;
+            try
+            {
+                // Un percorso relativo si risolverebbe sulla cartella di lavoro del
+                // processo: non e' mai quello che intendeva chi ha salvato il link.
+                if (!Path.IsPathRooted(wanted)) { problem = "serve un percorso assoluto"; return false; }
+                full = Path.GetFullPath(wanted);
+            }
+            catch (Exception) { problem = "percorso non valido"; return false; }
+
+            bool isDir = Directory.Exists(full);
+            bool isFile = !isDir && File.Exists(full);
+            if (!isDir && !isFile) { problem = "percorso inesistente"; return false; }
+
+            ProcessStartInfo psi = new ProcessStartInfo();
+            // Percorso pieno e non "explorer.exe": senza shell la ricerca
+            // dipenderebbe dal PATH del processo.
+            psi.FileName = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.Windows), "explorer.exe");
+            // Una cartella si apre mostrandone il contenuto: "/select," sul suo
+            // percorso aprirebbe il livello superiore con la cartella evidenziata.
+            psi.Arguments = isDir ? "\"" + full + "\"" : "/select,\"" + full + "\"";
+            psi.UseShellExecute = false;   // la stringa non passa da nessuna shell
+            try { Process.Start(psi); }
+            catch (Exception err) { problem = err.Message; return false; }
+            return true;
         }
 
         /// <summary>Non si scrive sul disco qualcosa che non somiglia a un archivio.</summary>

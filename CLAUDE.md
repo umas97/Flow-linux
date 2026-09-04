@@ -44,7 +44,17 @@ would never arrive. Adding a frontend `fetch` to a new endpoint therefore requir
 `case` in that switch.
 
 Endpoints: `GET/PUT /api/data`, `GET /api/info` (paths, backup count/bytes, WebView2
-version), `POST /api/reveal` (explorer), `/api/quit`, `/api/health`.
+version), `POST /api/reveal` (explorer), `POST /api/pick`, `POST /api/open`,
+`/api/quit`, `/api/health`.
+
+`/api/pick` and `/api/open` take a **plain-text body, not JSON** (`dir`/`file` and a
+path respectively): there is no JSON parser in `Flow.cs` and one string doesn't
+justify writing one. `/api/pick` opens the native `FolderBrowserDialog` /
+`OpenFileDialog`, so it answers only once the user has chosen — it holds the request
+with `e.GetDeferral()` and shows the dialog from a `BeginInvoke` (a modal dialog can't
+be opened inside the event handler). `/api/open` only ever *reveals* a path in
+Explorer (`explorer.exe "<dir>"` or `/select,"<file>"`), refuses anything that isn't a
+rooted, existing path, and **never** `Process.Start`s the file itself.
 
 ### Frontend: globals, no modules
 
@@ -125,6 +135,10 @@ work; it is mirrored into `localStorage['flow.route']` for the next launch.
   [index.html](app/index.html#L9-L21) re-reads `localStorage['flow.prefs']` before first
   paint to avoid a flash; any new setting that affects first paint must be mirrored there
   *and* in `Store.savePrefs()`.
+- **Project tabs.** `project.view` is one of `board` / `list` / `calendar` / `notes`,
+  validated in `normalize()` — an unknown value falls back to `board` rather than
+  leaving `V.content` with nothing to render. The Notes tab holds `project.notes`
+  (markdown) and `project.links` (`{ id, path, label, color, kind }`).
 - **Quick add** ([app/js/parse.js](app/js/parse.js)) parses Italian natural language:
   dates (`oggi`, `ven`, `tra 3 giorni`, `12/03`, `12 marzo`), `!alta`, `#tag`, `@person`,
   `+project`. Tags and people named there are created on the fly by `Store.ensureTag` /

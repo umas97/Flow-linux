@@ -118,11 +118,27 @@
     };
   }
 
+  /**
+   * Ultimo segmento di un percorso Windows, usato come etichetta predefinita
+   * di un collegamento. Regola unica: la usano sia il selettore sia l'incolla.
+   * Su una radice resta la lettera del disco ("D:"), che almeno si riconosce.
+   */
+  Store.pathLeaf = function (path) {
+    var clean = String(path || '').trim().replace(/[\\/]+$/, '');
+    if (!clean) return 'Collegamento';
+    var parts = clean.split(/[\\/]/);
+    return parts[parts.length - 1] || clean;
+  };
+
   /* ---------------------------- normalizzazione ---------------------------- */
 
   /* Deve restare allineato a Views.SORTS: store.js è caricato prima di views.js,
      quindi normalize non può leggere l'elenco da là. */
   var SECTION_SORTS = ['manual', 'priority', 'due', 'created-desc', 'created-asc', 'updated', 'alpha'];
+
+  // Schede di un progetto. Un valore ignoto torna alla bacheca invece di
+  // lasciare V.content senza niente da mostrare.
+  var PROJECT_VIEWS = ['board', 'list', 'calendar', 'notes'];
 
   function normalize(data) {
     var d = data && typeof data === 'object' ? data : {};
@@ -172,8 +188,23 @@
         // a mano) torna a Manuale invece di far sparire le attività.
         if (SECTION_SORTS.indexOf(s.sort) < 0) s.sort = 'manual';
       });
-      if (!p.view) p.view = 'board';
+      if (PROJECT_VIEWS.indexOf(p.view) < 0) p.view = 'board';
       if (!p.createdAt) p.createdAt = n;
+
+      // Scheda Note: appunti in markdown e collegamenti a cartelle o file.
+      if (typeof p.notes !== 'string') p.notes = '';
+      p.links = (Array.isArray(p.links) ? p.links : [])
+        // Un collegamento senza percorso non porta in nessun posto: si scarta.
+        .filter(function (l) { return l && typeof l.path === 'string' && l.path.length; })
+        .map(function (l) {
+          return {
+            id: l.id || U.uid('l'),
+            path: l.path,
+            label: l.label || Store.pathLeaf(l.path),
+            color: l.color || p.color,
+            kind: l.kind === 'file' ? 'file' : 'dir'
+          };
+        });
     });
 
     var validProjects = {};

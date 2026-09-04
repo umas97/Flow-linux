@@ -99,6 +99,7 @@ Da **Impostazioni → Apri cartella** arrivi al file in due clic.
   trascinamento.
 - **Calendario** — mese intero; trascina un'attività su un altro giorno per
   spostarne la scadenza.
+- **Note** — appunti del progetto e collegamenti a cartelle o file sul disco.
 - **Prossimi 7 giorni**, **Tutte le attività**, **Completate**.
 
 **Ordinamento delle sezioni**
@@ -126,6 +127,25 @@ per data e non sono interessate.
 
 Titolo, note in markdown leggero, scadenza, priorità, etichette colorate,
 assegnatario, sotto-attività con barra di avanzamento, duplicazione.
+
+**Note e collegamenti di un progetto**
+
+La quarta scheda di un progetto (tasto `4`) tiene due cose:
+
+- gli **appunti** del progetto, in markdown leggero come le note di un'attività;
+- i **collegamenti**: pulsanti colorati che puntano a una cartella o a un file sul
+  disco. Un click apre l'**Esplora risorse** — su una cartella ne mostra il
+  contenuto, su un file apre la cartella che lo contiene con il file già
+  selezionato. **Il file non viene mai eseguito.**
+
+Il percorso si mette con il selettore di Windows (*Scegli cartella…* /
+*Scegli file…*), incollandolo, o scrivendolo a mano. L'etichetta è preimpostata col
+nome dell'ultima cartella e si può cambiare, come il colore. Il pulsante `…` su un
+collegamento apre *Modifica*, *Copia percorso* e *Rimuovi*.
+
+I collegamenti servono l'Esplora risorse, quindi funzionano solo avviando
+`Flow.exe`: aprendo `app\index.html` nel browser si vedono, ma il click avvisa che
+serve l'applicazione.
 
 **Ordine dei progetti**
 
@@ -208,7 +228,7 @@ martedì, priorità alta, etichetta `urgente`, assegnata a te, nel progetto *Lav
 | `Ctrl+E` | esporta l'archivio |
 | `T` | cambia tema |
 | `G` poi `O` `P` `A` `C` | vai a Oggi / Prossimi / Tutte / Completate |
-| `1` `2` `3` | bacheca / elenco / calendario |
+| `1` `2` `3` `4` | bacheca / elenco / calendario / note |
 | `Esc` | chiudi pannello o finestra |
 | `?` | elenco completo delle scorciatoie |
 

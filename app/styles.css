@@ -639,6 +639,70 @@ body.is-dragging .drop-zone.is-empty.drop-active { border-color: var(--accent); 
 body.is-dragging .column.drop-active .col-body.is-empty { border-color: var(--accent); }
 
 /* ============================================================
+   VISTA NOTE (appunti del progetto e collegamenti al disco)
+   ============================================================ */
+/* flex: none come le altre viste: chi scorre e' .content (vedi fase 1). */
+.notes-page { padding: 18px 22px 40px; max-width: 900px; flex: none; }
+.np-block { margin-bottom: 26px; }
+.np-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.np-head h3 {
+  font-size: 12px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .6px; color: var(--text-3);
+}
+.np-head .col-count { margin-right: 2px; }
+/* Il pulsante va a destra in entrambi i blocchi, con o senza contatore. */
+.np-head > .btn { margin-left: auto; }
+.np-notes {
+  background: var(--surface); border-color: var(--border);
+  min-height: 110px; padding: 14px 16px;
+}
+.np-notes:hover { background: var(--surface-2); }
+.np-notes-edit { min-height: 220px; }
+
+.link-grid {
+  display: grid; gap: 8px;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+}
+/* Un div, non un button: dentro c'e' il pulsante del menu. */
+.link-card {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 8px 9px 11px; min-width: 0;
+  background: var(--surface); border: 1px solid var(--border);
+  border-left: 3px solid var(--lc, var(--accent));
+  border-radius: 10px; cursor: pointer;
+  transition: background .12s, border-color .12s, transform .12s;
+}
+.link-card:hover {
+  background: var(--surface-2);
+  border-color: color-mix(in srgb, var(--lc, var(--accent)) 45%, var(--border));
+  border-left-color: var(--lc, var(--accent));
+  transform: translateY(-1px);
+}
+.lk-ic {
+  display: grid; place-items: center; flex: none;
+  width: 30px; height: 30px; border-radius: 8px;
+  color: var(--lc, var(--accent));
+  background: color-mix(in srgb, var(--lc, var(--accent)) 14%, transparent);
+}
+.lk-body { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
+.lk-label {
+  font-size: 13px; font-weight: 600; color: var(--text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* Il percorso intero sta nel title del riquadro: qui si taglia in fondo, senza
+   il trucco di direction: rtl, che sposta i due punti di "C:" a fine riga. */
+.lk-path {
+  font-family: var(--mono); font-size: 11px; color: var(--text-3);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.lk-more { flex: none; opacity: 0; transition: opacity .12s; }
+.link-card:hover .lk-more { opacity: 1; }
+
+/* Finestra del collegamento */
+.lk-browse { display: flex; gap: 8px; flex-wrap: wrap; }
+.input.mono { font-family: var(--mono); font-size: 12.5px; }
+
+/* ============================================================
    VISTA ELENCO
    ============================================================ */
 .list-view { padding: 14px 22px 40px; max-width: 1080px; flex: none; }

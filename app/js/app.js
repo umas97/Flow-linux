@@ -24,6 +24,13 @@
 
   App.renderContent = function () {
     var c = U.$('#content');
+    /* Gli appunti del progetto sono l'unico campo di testo che vive dentro
+       #content: ridisegnarlo mentre si scrive azzererebbe testo e cursore.
+       Stessa ragione di isEditingInDetail, con lo stesso limite volontario —
+       il controllo guarda quel solo campo, non un <button> col fuoco. */
+    var a = document.activeElement;
+    if (a && a.classList && a.classList.contains('np-notes-edit')) return;
+
     var top = c.scrollTop, left = c.scrollLeft;
     // La bacheca scorre in orizzontale da sé e ogni colonna in verticale:
     // senza salvarli, ogni ridisegno riporterebbe tutto all'inizio.
@@ -256,6 +263,7 @@
               st.projects.push({
                 id: id, name: name, color: color, icon: emoji, archived: false, view: 'board',
                 order: Store.nextProjectOrder(), // in fondo all'elenco
+                notes: '', links: [],
                 createdAt: new Date().toISOString(),
                 sections: [
                   { id: U.uid('s'), name: 'Da fare', order: 1000 },
@@ -693,6 +701,7 @@
           ['Vista bacheca', ['1']],
           ['Vista elenco', ['2']],
           ['Vista calendario', ['3']],
+          ['Vista note', ['4']],
           ['Nuovo progetto', ['Ctrl', 'Shift', 'P']]
         ]
       },
@@ -960,6 +969,32 @@
         if (!p) return;
         Store.quiet(function () { p.view = el.dataset.view; });
         return App.render();
+      }
+
+      /* ---- scheda Note del progetto ---- */
+
+      case 'edit-proj-notes':
+        return editProjectNotes();
+
+      case 'add-link': {
+        var lp = currentProject();
+        if (lp) linkModal(lp, null);
+        return;
+      }
+
+      case 'open-link': {
+        var op = currentProject();
+        var ol = op && linkOf(op, id);
+        if (ol) openLink(ol);
+        return;
+      }
+
+      case 'link-menu': {
+        e.stopPropagation();
+        var mp = currentProject();
+        var ml = mp && linkOf(mp, id);
+        if (ml) openLinkMenu(el, mp, ml);
+        return;
       }
 
       case 'add-task': {
@@ -1279,6 +1314,224 @@
       Menu.close();
       App.render();
     });
+  }
+
+  /* ================================================================== *
+   * SCHEDA NOTE: APPUNTI E COLLEGAMENTI
+   * ================================================================== */
+
+  function linkOf(p, id) {
+    return (p.links || []).filter(function (l) { return l.id === id; })[0] || null;
+  }
+
+  /* Stesso gioco delle note di un'attivita': la vista markdown viene
+     sostituita da un textarea, e il salvataggio avviene sul blur. */
+  function editProjectNotes() {
+    var p = currentProject();
+    var holder = U.$('[data-act="edit-proj-notes"].np-notes');
+    if (!p || !holder) return;
+
+    var ta = U.el('textarea', { class: 'notes-edit np-notes-edit' });
+    ta.value = p.notes || '';
+    holder.replaceWith(ta);
+    ta.focus();
+    ta.setSelectionRange(ta.value.length, ta.value.length);
+    ta.style.height = Math.max(220, ta.scrollHeight) + 'px';
+
+    var closed = false;
+    function done(save) {
+      if (closed) return;
+      closed = true;
+      // Con Esc il fuoco e' ancora nel campo, e il guardiano di renderContent
+      // bloccherebbe il ridisegno lasciando il textarea a schermo. Il gestore
+      // del blur non rientra: "closed" e' gia' vero.
+      ta.blur();
+      if (save && ta.value !== (p.notes || '')) {
+        Store.commit('appunti del progetto', function () { p.notes = ta.value; });
+      }
+      App.render();
+    }
+    ta.addEventListener('blur', function () { done(true); });
+    ta.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Escape') { ev.stopPropagation(); done(false); }
+      // Invio da solo va a capo: sono appunti, non un campo a riga singola.
+      if (ev.key === 'Enter' && (ev.ctrlKey || ev.metaKey)) { ev.preventDefault(); ta.blur(); }
+    });
+  }
+
+  /* ---------------- collegamenti a cartelle e file ---------------- */
+
+  var LINK_COLORS = TAG_COLORS;
+
+  /** Senza host non c'e' nessun Esplora risorse da aprire. */
+  function needsHost() {
+    if (Store.backend === 'server') return false;
+    App.toast('Disponibile solo avviando Flow.exe', 'alert');
+    return true;
+  }
+
+  /* Un percorso incollato non dice se e' una cartella o un file: l'estensione
+     e' l'unico indizio. Il tipo resta correggibile a mano nella finestra. */
+  function guessKind(path) {
+    return /[.][A-Za-z0-9]{1,8}$/.test(String(path).replace(/[\\/]+$/, '')) ? 'file' : 'dir';
+  }
+
+  function openLink(l) {
+    if (needsHost()) return;
+    fetch('/api/open', { method: 'POST', body: l.path }).then(function (r) {
+      if (r.ok) return null;
+      return r.json().catch(function () { return null; });
+    }).then(function (j) {
+      if (j) App.toast('Non si apre: ' + (j.error || 'percorso non raggiungibile'), 'alert');
+    }).catch(function () {
+      App.toast('Non si apre: host non raggiungibile', 'alert');
+    });
+  }
+
+  function openLinkMenu(anchorEl, p, l) {
+    Menu.open(anchorEl, [
+      { head: 'Collegamento' },
+      { ic: 'edit', label: 'Modifica', onClick: function () { linkModal(p, l); } },
+      {
+        ic: 'copy', label: 'Copia percorso', onClick: function () {
+          try { navigator.clipboard.writeText(l.path); App.toast('Percorso copiato', 'copy'); }
+          catch (err) { App.toast('Copia non riuscita', 'alert'); }
+        }
+      },
+      { sep: true },
+      { ic: 'trash', label: 'Rimuovi', danger: true, onClick: function () { removeLink(p, l); } }
+    ], { width: 220 });
+  }
+
+  function removeLink(p, l) {
+    Store.commit('collegamento rimosso', function () {
+      p.links = p.links.filter(function (x) { return x.id !== l.id; });
+    });
+    App.render();
+    App.toast('Collegamento rimosso', 'trash', true);
+  }
+
+  /**
+   * Finestra di un collegamento, la stessa per crearlo e per modificarlo.
+   * Il percorso si mette in tre modi: selettore nativo, incolla, o a mano.
+   */
+  function linkModal(p, existing) {
+    var color = (existing && existing.color) || p.color;
+    var kind = (existing && existing.kind) || 'dir';
+    // Su un collegamento nuovo etichetta e tipo seguono il percorso finche' non
+    // li si mette a mano; su uno esistente sono sempre roba dell'utente.
+    var ownLabel = !!existing;
+    var ownKind = !!existing;
+
+    Modal.open(
+      '<div class="modal-head"><h2>' + (existing ? 'Modifica collegamento' : 'Nuovo collegamento') + '</h2></div>' +
+      '<div class="modal-body">' +
+      '<div class="field"><label>Percorso</label>' +
+      '<input class="input mono" id="lkPath" spellcheck="false" placeholder="C:\Progetti\Casa" value="' +
+      (existing ? U.esc(existing.path) : '') + '"></div>' +
+      '<div class="field"><div class="lk-browse">' +
+      '<button class="btn sm" data-x="pick-dir">' + icon('folder', 'sm') + 'Scegli cartella\u2026</button>' +
+      '<button class="btn sm" data-x="pick-file">' + icon('file', 'sm') + 'Scegli file\u2026</button>' +
+      '</div></div>' +
+      '<div class="field"><label>Tipo</label><div class="seg" id="lkKind">' +
+      '<button data-v="dir">Cartella</button><button data-v="file">File</button></div></div>' +
+      '<div class="field"><label>Etichetta</label>' +
+      '<input class="input" id="lkLabel" maxlength="40" placeholder="Nome della cartella" value="' +
+      (existing ? U.esc(existing.label) : '') + '"></div>' +
+      '<div class="field"><label>Colore</label><div class="swatches" id="lkColor">' +
+      LINK_COLORS.map(function (c) {
+        return '<button class="swatch' + (c === color ? ' on' : '') + '" data-c="' + c + '" style="--c:' + c + '"></button>';
+      }).join('') + '</div></div>' +
+      '</div>' +
+      '<div class="modal-foot">' +
+      (existing ? '<button class="btn danger" data-x="del">Rimuovi</button>' : '') +
+      '<button class="btn" data-x="cancel">Annulla</button>' +
+      '<button class="btn primary" data-x="save">Salva</button></div>',
+      {
+        onMount: function (box) {
+          var pathInput = U.$('#lkPath', box);
+          var labelInput = U.$('#lkLabel', box);
+
+          function setKind(v) {
+            kind = v === 'file' ? 'file' : 'dir';
+            U.$$('#lkKind button', box).forEach(function (b) {
+              b.classList.toggle('active', b.dataset.v === kind);
+            });
+          }
+          setKind(kind);
+
+          U.$('#lkKind', box).onclick = function (ev) {
+            var b = ev.target.closest('[data-v]');
+            if (!b) return;
+            ownKind = true;
+            setKind(b.dataset.v);
+          };
+          U.$('#lkColor', box).onclick = function (ev) {
+            var b = ev.target.closest('[data-c]');
+            if (!b) return;
+            color = b.dataset.c;
+            U.$$('#lkColor .swatch', box).forEach(function (x) { x.classList.toggle('on', x === b); });
+          };
+
+          labelInput.addEventListener('input', function () { ownLabel = true; });
+          pathInput.addEventListener('input', function () {
+            var v = pathInput.value.trim();
+            if (!ownLabel) labelInput.value = v ? Store.pathLeaf(v) : '';
+            if (!ownKind) setKind(guessKind(v));
+          });
+
+          function pick(what) {
+            if (needsHost()) return;
+            fetch('/api/pick', { method: 'POST', body: what })
+              .then(function (r) { return r.json(); })
+              .then(function (res) {
+                if (!res || !res.path) return;   // finestra annullata
+                pathInput.value = res.path;
+                // Il selettore sa con certezza cosa e' stato scelto.
+                ownKind = true;
+                setKind(what);
+                if (!ownLabel) labelInput.value = Store.pathLeaf(res.path);
+                pathInput.focus();
+              })
+              .catch(function () { App.toast('Selettore non disponibile', 'alert'); });
+          }
+          U.$('[data-x="pick-dir"]', box).onclick = function () { pick('dir'); };
+          U.$('[data-x="pick-file"]', box).onclick = function () { pick('file'); };
+
+          if (existing) {
+            U.$('[data-x="del"]', box).onclick = function () {
+              Modal.close();
+              removeLink(p, existing);
+            };
+          }
+          U.$('[data-x="cancel"]', box).onclick = Modal.close;
+          U.$('[data-x="save"]', box).onclick = save;
+          pathInput.addEventListener('keydown', function (ev) {
+            if (ev.key === 'Enter') { ev.preventDefault(); save(); }
+          });
+          labelInput.addEventListener('keydown', function (ev) {
+            if (ev.key === 'Enter') { ev.preventDefault(); save(); }
+          });
+
+          function save() {
+            var path = pathInput.value.trim();
+            if (!path) { App.toast('Serve un percorso', 'alert'); pathInput.focus(); return; }
+            var label = labelInput.value.trim() || Store.pathLeaf(path);
+            Store.commit(existing ? 'collegamento' : 'nuovo collegamento', function () {
+              if (existing) {
+                existing.path = path; existing.label = label;
+                existing.color = color; existing.kind = kind;
+              } else {
+                if (!Array.isArray(p.links)) p.links = [];
+                p.links.push({ id: U.uid('l'), path: path, label: label, color: color, kind: kind });
+              }
+            });
+            Modal.close();
+            App.render();
+          }
+        }
+      }
+    );
   }
 
   /* ================================================================== *
@@ -1661,10 +1914,10 @@
       if (dest) { e.preventDefault(); return App.go(dest); }
     }
 
-    if (App.ui.route.kind === 'project' && ['1', '2', '3'].indexOf(e.key) >= 0) {
+    if (App.ui.route.kind === 'project' && ['1', '2', '3', '4'].indexOf(e.key) >= 0) {
       var p = currentProject();
       if (!p) return;
-      var v = { '1': 'board', '2': 'list', '3': 'calendar' }[e.key];
+      var v = { '1': 'board', '2': 'list', '3': 'calendar', '4': 'notes' }[e.key];
       Store.quiet(function () { p.view = v; });
       return App.render();
     }

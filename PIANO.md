@@ -20,7 +20,7 @@ Legenda stato: `da fare` · `in corso` · `fatto` · `rimandato`
 | 6 | 8 | Trascinamento attività (riordino e cambio sezione) | fatto | `app.js`, `views.js`, `styles.css` |
 | 7 | 6 | Ordinamenti per sezione | fatto | `views.js`, `app.js`, `store.js`, `icons.js`, `styles.css`, `README.md` |
 | 8 | 5 | Riordino dei progetti + lucchetto | fatto | `views.js`, `app.js`, `store.js`, `index.html`, `styles.css`, `README.md` |
-| 9 | 1 | Sezione Note per progetto con collegamenti a cartelle | da fare | `src/Flow.cs`, `views.js`, `app.js`, `store.js`, `styles.css`, `README.md` |
+| 9 | 1 | Sezione Note per progetto con collegamenti a cartelle | fatto | `src/Flow.cs`, `views.js`, `app.js`, `store.js`, `styles.css`, `README.md`, `CLAUDE.md` |
 | 10 | 9 | Ripulitura dei dati personali + git | da fare | `data/`, `dist/`, `.gitignore`, `README.md` |
 
 ### Perché quest'ordine
@@ -641,7 +641,7 @@ mai avviare un trascinamento.
 ## Fase 9 · Sezione Note per progetto con collegamenti a cartelle
 <sub>richiesta 1</sub>
 
-**Stato:** da fare
+**Stato:** fatto
 
 ### Decisioni prese
 - **Quarta scheda “Note”** accanto a Bacheca / Elenco / Calendario
@@ -703,6 +703,95 @@ mai avviare un trascinamento.
 I percorsi arrivano dall'interfaccia locale, ma l'endpoint `/api/open` va comunque scritto
 in modo che accetti **solo** percorsi esistenti e non passi mai la stringa a una shell
 (argomenti separati, niente `cmd /c`).
+
+### Fatto — host (`Flow.exe` ricompilato)
+- **Il corpo delle due richieste è testo in chiaro, non JSON** (`dir`/`file` per il
+  selettore, il percorso per l'apertura). Scostamento voluto dal piano: in `Flow.cs` non
+  c'è un interprete JSON, e scriverne uno — con l'annullamento delle sequenze di
+  escape, che in un percorso Windows sono tutte barre rovesciate — per estrarre una
+  stringa sola avrebbe aggiunto solo occasioni di sbagliare.
+- `POST /api/pick` ([Flow.cs:475](src/Flow.cs#L475)): apre `FolderBrowserDialog` o
+  `OpenFileDialog` e risponde `{"path":"…"}` oppure `{"cancelled":true}`.
+  Una finestra modale **non si può aprire dentro il gestore di
+  `WebResourceRequested`**: la richiesta viene messa in attesa con `e.GetDeferral()` e la
+  finestra si apre da un `BeginInvoke`, così il gestore ritorna subito e la risposta
+  parte a scelta effettuata. Lato pagina resta una `fetch` normale.
+- `POST /api/open` ([Flow.cs:589](src/Flow.cs#L589)): `Reveal()` accetta solo percorsi
+  **assoluti ed esistenti** (`Path.IsPathRooted` + `Directory.Exists`/`File.Exists`),
+  toglie le virgolette che l'Esplora risorse mette con “Copia come percorso”, e chiama
+  `explorer.exe` con `UseShellExecute = false` e il percorso pieno di
+  `%SystemRoot%` — niente shell, e nessuna dipendenza dal `PATH` del processo.
+  Una cartella si apre con `explorer.exe "<cartella>"` (mostra il contenuto), un file con
+  `/select,"<file>"` (lo evidenzia nella sua cartella). **Nessun `Process.Start` sul
+  file: non si esegue niente.** Un percorso inesistente dà 404 e nessuna finestra.
+- `ReadBody()` estratto da `SaveFromRequest` e condiviso dai tre endpoint che leggono un
+  corpo.
+- `/api/reveal` non è stato toccato.
+
+### Fatto — interfaccia
+- Quarta scheda **Note** ([views.js:305](app/js/views.js#L305)), `V.notes(p)`
+  ([views.js:658](app/js/views.js#L658)), istradamento in `V.content`, tasto `4` tra le
+  scorciatoie e nella finestra `?`.
+- `normalize()`: `p.notes` forzato a stringa, `p.links` ricostruito voce per voce
+  (`id`, `path`, `label` = `Store.pathLeaf(path)`, `color` = colore del progetto,
+  `kind`), scartando le voci **senza percorso** — un collegamento senza percorso non
+  porta in nessun posto. `Store.pathLeaf` è la regola unica dell'etichetta predefinita:
+  la usano il selettore, l'incolla e `normalize`.
+- `project.view` ora è **validato** contro `PROJECT_VIEWS`: prima un valore ignoto
+  cadeva sulla bacheca per caso (la catena di ternari), adesso `normalize` lo riporta a
+  `board`. `App.newProject` scrive già `notes: ''` e `links: []`, perché
+  `Store.commit` non rinormalizza.
+- Appunti: `data-act="edit-proj-notes"` sostituisce la vista markdown con un
+  `<textarea>`, salvataggio sul `blur` con `Store.commit('appunti del progetto', …)`,
+  `Esc` annulla, `Ctrl+Invio` conferma.
+  **Correzione collaterale necessaria:** è il primo campo di testo che vive dentro
+  `#content`, e `App.renderContent()` ricostruisce sempre tutto — qualunque
+  ridisegno avrebbe azzerato testo e cursore. Ora `renderContent` salta il giro se il
+  fuoco è su `.np-notes-edit`, come `isEditingInDetail` fa per il pannello. Di
+  conseguenza `done()` chiama `ta.blur()` prima di ridisegnare, altrimenti con `Esc` il
+  campo resterebbe a schermo (il rientro dal `blur` è chiuso da una variabile).
+- Collegamenti: griglia di riquadri colorati, click → `/api/open`; il `…` apre
+  Modifica / Copia percorso / Rimuovi. Il riquadro è un `<div>` e non un `<button>`
+  perché contiene il pulsante del menu, e un `<button>` annidato il parser HTML lo
+  sposterebbe fuori; la delega prende il `[data-act]` più interno, quindi il menu vince
+  sull'apertura.
+- Finestra del collegamento, la stessa per creare e per modificare: percorso,
+  *Scegli cartella…* / *Scegli file…*, tipo, etichetta, colore. Etichetta e tipo
+  seguono il percorso finché non li si mette a mano (`ownLabel` / `ownKind`); il tipo di
+  un percorso **incollato** si indovina dall'estensione, che è l'unico indizio
+  disponibile, ed è correggibile col selettore a due stati.
+- Senza host (`index.html` aperto nel browser) i collegamenti si vedono, ma click e
+  selettore avvisano “Disponibile solo avviando Flow.exe”, come già fa
+  “Apri cartella” nelle impostazioni.
+- README (nuova vista, paragrafo sui collegamenti, tasto `4`) e sezione *Endpoints* di
+  CLAUDE.md aggiornati.
+
+### Non fatto: trascinamento dall'Esplora risorse
+Il punto 4 del piano prevedeva di provarci e di **degradare su selettore + incolla** se
+l'aggancio fosse risultato fragile. È fragile per un motivo strutturale, non di
+implementazione: Chromium **non espone il percorso reale** dei file rilasciati su una
+pagina (`dataTransfer.files` dà solo il nome), e in WebView2 ospitato in WinForms il
+controllo è una finestra figlia nativa che si prende i messaggi di trascinamento, quindi
+nemmeno il `DragDrop` del form li vede. Le tre vie che restano — selettore,
+incolla, scrittura a mano — coprono lo stesso bisogno e sono tutte attive.
+
+### Verificato
+- `build.cmd` (compilazione pulita) e avvio dell'app: `data/flow.log` riporta
+  `navigazione: ok` e **nessun errore di pagina** — gli errori di script non catturati
+  finiscono lì, quindi il primo ridisegno con la scheda nuova è andato a buon fine.
+  L'app è stata poi terminata senza chiusura pulita, di proposito: così `board.json`
+  non è stato riscritto con i campi nuovi durante un cambio di codice.
+- `normalize()` provato fuori dal browser sui casi limite: collegamento senza etichetta
+  (la prende dal percorso), senza percorso (scartato), `null` nell'array, `notes` non
+  stringa, `view` inventata, e **idempotenza** su due passaggi consecutivi.
+- `Store.pathLeaf` su percorso normale, con barra finale, radice `D:` e UNC.
+
+### Non verificato a mano
+Il selettore nativo, l'apertura dell'Esplora risorse e la resa della scheda vanno
+guardati a schermo: sono l'unica parte che non si prova da riga di comando. Da provare
+in particolare *Scegli cartella…*, un collegamento a file (deve aprire la cartella con
+il file evidenziato, **non** eseguirlo) e un percorso cancellato dal disco (deve dare
+l'avviso, non una finestra).
 
 ---
 

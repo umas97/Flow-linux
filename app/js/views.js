@@ -301,7 +301,8 @@
       var views = [
         { id: 'board', ic: 'board', label: 'Bacheca' },
         { id: 'list', ic: 'list', label: 'Elenco' },
-        { id: 'calendar', ic: 'calendar', label: 'Calendario' }
+        { id: 'calendar', ic: 'calendar', label: 'Calendario' },
+        { id: 'notes', ic: 'file', label: 'Note' }
       ];
       right += '<div class="seg">' + views.map(function (v) {
         return '<button data-act="set-view" data-view="' + v.id + '" class="' + (p.view === v.id ? 'active' : '') + '" ' +
@@ -636,6 +637,52 @@
   };
 
   /* ------------------------------------------------------------------ *
+   * Vista Note: appunti del progetto e collegamenti al disco
+   * ------------------------------------------------------------------ */
+
+  /* Un <div> e non un <button>: dentro c'e' il pulsante del menu, e un
+     <button> annidato in un altro il parser HTML lo sposterebbe fuori.
+     La delega prende il [data-act] piu' interno, quindi il menu vince
+     sull'apertura del collegamento. */
+  function linkCard(l) {
+    return '<div class="link-card" data-act="open-link" data-id="' + l.id + '" ' +
+      'style="--lc:' + l.color + '" title="' + U.esc(l.path) + '">' +
+      '<span class="lk-ic">' + icon(l.kind === 'file' ? 'file' : 'folder') + '</span>' +
+      '<span class="lk-body"><span class="lk-label">' + U.esc(l.label) + '</span>' +
+      '<span class="lk-path">' + U.esc(l.path) + '</span></span>' +
+      '<button class="icon-btn tiny lk-more" data-act="link-menu" data-id="' + l.id + '" ' +
+      'title="Opzioni del collegamento">' + icon('more', 'sm') + '</button>' +
+      '</div>';
+  }
+
+  V.notes = function (p) {
+    var links = p.links || [];
+    return '<div class="notes-page">' +
+
+      '<section class="np-block">' +
+      '<div class="np-head"><h3>Appunti</h3>' +
+      '<button class="btn sm ghost" data-act="edit-proj-notes">' + icon('edit', 'sm') + 'Modifica</button>' +
+      '</div>' +
+      '<div class="notes-view np-notes' + (p.notes ? '' : ' placeholder') + '" data-act="edit-proj-notes">' +
+      (p.notes ? U.miniMarkdown(p.notes)
+        : 'Appunti del progetto: titoli, elenchi, link. Si scrive in markdown leggero.') +
+      '</div></section>' +
+
+      '<section class="np-block">' +
+      '<div class="np-head"><h3>Collegamenti</h3>' +
+      '<span class="col-count">' + links.length + '</span>' +
+      '<button class="btn sm" data-act="add-link">' + icon('plus', 'sm') + 'Aggiungi collegamento</button>' +
+      '</div>' +
+      (links.length
+        ? '<div class="link-grid">' + links.map(linkCard).join('') + '</div>'
+        : emptyState('folder', 'Nessun collegamento',
+          'Collega la cartella del progetto sul disco: un click la apre nell’Esplora risorse.')) +
+      '</section>' +
+
+      '</div>';
+  };
+
+  /* ------------------------------------------------------------------ *
    * Punto d'ingresso
    * ------------------------------------------------------------------ */
 
@@ -644,7 +691,9 @@
     if (r.kind === 'project') {
       var p = Store.project(r.id);
       if (!p) { App.go('today'); return; }
-      body = p.view === 'list' ? V.list(p) : p.view === 'calendar' ? V.calendar(p) : V.board(p);
+      body = p.view === 'list' ? V.list(p)
+        : p.view === 'calendar' ? V.calendar(p)
+          : p.view === 'notes' ? V.notes(p) : V.board(p);
     } else if (r.kind === 'today') {
       body = V.dashboard();
     } else {
