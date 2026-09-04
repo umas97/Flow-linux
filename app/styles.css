@@ -260,7 +260,7 @@ kbd {
 .nav-count.hot { color: #fff; background: var(--p3); border-color: transparent; }
 
 .side-group { margin-top: 14px; min-height: 0; display: flex; flex-direction: column; }
-.side-group.collapsed .side-list { display: none; }
+.side-group.collapsed .side-list, .side-group.collapsed .side-lock { display: none; }
 .side-group-head {
   display: flex; align-items: center; gap: 4px;
   padding: 0 12px 0 14px; height: 26px;
@@ -281,7 +281,33 @@ kbd {
 .side-group.collapsed .chev { transform: rotate(-90deg); }
 
 .side-list { padding: 2px 8px 0; min-height: 0; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; gap: 1px; }
-#projectsGroup { flex: 1; min-height: 60px; }
+#projectsGroup { flex: 1; min-height: 96px; } /* testata + una riga + lucchetto */
+
+/* ---- riordino dei progetti (lucchetto aperto) ---- */
+/* Ombreggiatura leggera sull'elenco: si vede subito che la modalità è attiva. */
+.side-list.reorder {
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+  border-radius: 10px;
+  margin: 0 8px; padding: 2px 0 2px;
+  outline: 1px dashed color-mix(in srgb, var(--accent) 28%, transparent);
+}
+.side-list.reorder li { cursor: grab; }
+.side-list.reorder li.dragging { opacity: .35; }
+.side-list.reorder li.dragging, .side-list.reorder li.dragging * { cursor: grabbing; }
+.proj-grip { color: var(--text-3); flex: none; display: grid; place-items: center; width: 12px; margin-left: -4px; }
+.side-list.reorder li:hover .proj-grip { color: var(--text-2); }
+
+.side-lock { padding: 6px 8px 0; flex: none; }
+.lock-btn {
+  display: flex; align-items: center; gap: 7px;
+  width: 100%; height: 26px; padding: 0 9px;
+  border-radius: 8px;
+  font-size: 11.5px; font-weight: 600;
+  color: var(--text-3);
+  transition: background .13s, color .13s;
+}
+.lock-btn:hover { background: var(--surface-hover); color: var(--text-2); }
+.lock-btn.on { color: var(--accent-text); background: var(--accent-soft); }
 
 .proj-dot {
   width: 9px; height: 9px; border-radius: 3px; flex: none;

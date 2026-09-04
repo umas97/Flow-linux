@@ -19,7 +19,7 @@ Legenda stato: `da fare` · `in corso` · `fatto` · `rimandato`
 | 5 | 4 | Sotto-attività a capo automatico | fatto | `detail.js`, `styles.css` |
 | 6 | 8 | Trascinamento attività (riordino e cambio sezione) | fatto | `app.js`, `views.js`, `styles.css` |
 | 7 | 6 | Ordinamenti per sezione | fatto | `views.js`, `app.js`, `store.js`, `icons.js`, `styles.css`, `README.md` |
-| 8 | 5 | Riordino dei progetti + lucchetto | da fare | `views.js`, `app.js`, `store.js`, `index.html`, `styles.css` |
+| 8 | 5 | Riordino dei progetti + lucchetto | fatto | `views.js`, `app.js`, `store.js`, `index.html`, `styles.css`, `README.md` |
 | 9 | 1 | Sezione Note per progetto con collegamenti a cartelle | da fare | `src/Flow.cs`, `views.js`, `app.js`, `store.js`, `styles.css`, `README.md` |
 | 10 | 9 | Ripulitura dei dati personali + git | da fare | `data/`, `dist/`, `.gitignore`, `README.md` |
 
@@ -556,7 +556,7 @@ il nome della sezione, il contatore, il selettore e il `…` stanno tutti in fil
 ## Fase 8 · Riordino dei progetti + lucchetto
 <sub>richiesta 5</sub>
 
-**Stato:** da fare
+**Stato:** fatto
 
 ### Decisioni prese
 - I progetti nella barra laterale si trascinano come le attività.
@@ -582,6 +582,59 @@ il nome della sezione, il contatore, il selettore e il `…` stanno tutti in fil
    `Store.quiet` (preferenza d'interfaccia, fuori dalla cronologia).
 6. A lucchetto aperto, un'ombreggiatura leggera sull'elenco rende evidente la modalità
    attiva.
+
+### Fatto
+- `normalize()` ([store.js](app/js/store.js#L146)): `p.order` assegnato a chi non l'ha
+  come `max(ordinePrecedente, i * 1000) + 1000`, scorrendo l'array nell'ordine attuale —
+  nessun progetto si muove al primo avvio dopo l'aggiornamento, anche se solo *alcuni*
+  progetti hanno già un `order` (il caso di un progetto creato prima del riavvio).
+  Subito dopo `d.projects` viene **riordinato per `order`**, come la fase 4 fa con le
+  sezioni: così `d.projects[0]` è davvero il primo progetto a schermo, e ci contano il
+  recupero delle attività orfane ([store.js:190](app/js/store.js#L190)) e `createTask`.
+- `settings.projectsLocked` con default `true` (`!== false`, come `detailAutoHide`).
+- `Store.activeProjects()` ordina per `order` — quindi barra laterale, cruscotto, palette
+  comandi, menu “Progetto” del pannello dettagli e inserimento rapido seguono tutti lo
+  stesso ordine senza toccarli uno per uno. `Store.nextProjectOrder()` dà al progetto
+  nuovo un posto in fondo: `App.newProject` scrive `order` alla creazione, perché
+  `Store.commit` **non** rinormalizza e un `order` mancante avrebbe dato `NaN` nel
+  confronto fino al riavvio successivo.
+- Barra laterale ([views.js:214](app/js/views.js#L214)): a lucchetto aperto il `<li>` prende
+  `draggable="true"` e `data-projdrag`, e la riga guadagna una maniglia `.proj-grip`.
+  **Trascinabile è il `<li>`, non la maniglia**: il `<button>` del progetto non è
+  trascinabile di per sé, quindi il trascinamento parte dall'antenato `draggable` e la
+  presa vale su tutta la riga. A lucchetto chiuso l'attributo non c'è nemmeno: non serve
+  nessun controllo nel gestore.
+- Pulsante lucchetto in `#projectsLock`, nuovo contenitore in
+  [index.html:52](app/index.html#L52) subito dopo l'elenco. Icone nuove `lock` / `unlock`
+  in [icons.js](app/js/icons.js). Lo stato passa da `Store.quiet`
+  ([app.js:884](app/js/app.js#L884)) e un avviso dice che la modalità è attiva.
+- `projectDragOver` / `projectDrop` ([app.js:1490](app/js/app.js#L1490)): rami separati in
+  testa a `dragover` e `drop`, con lo stesso schema della fase 6 — il DOM dice solo
+  *davanti a quale progetto* si è rilasciato, i vicini e i numeri arrivano dal modello, e
+  se il nuovo `order` finisce a meno di 1 da un vicino si rinumera tutto a passi di 1000
+  nella stessa `commit`. `Store.commit('riordino progetti', …)`, quindi la scelta è
+  annullabile.
+- `afterElement` presa un terzo parametro (il selettore dei fratelli), così la ricerca
+  della posizione d'inserimento è la stessa per attività e progetti. La linea di
+  inserimento nell'elenco è un `<li class="drop-line">` e non un `<div>`.
+- Lo **scorrimento automatico ai bordi** della fase 6 vale anche per l'elenco dei
+  progetti: `scroller()` cerca il primo antenato che scorre davvero e trova `.side-list`.
+  Serviva una riga: `edgeStep` si spegneva su `!drag.id`, che durante un trascinamento di
+  progetto è sempre nullo — ora guarda anche `drag.projId`.
+- Corpo separato per il trascinamento dei progetti (`body.is-dragging-proj` invece di
+  `is-dragging`): `is-dragging` accende i riquadri tratteggiati “Trascina qui” delle
+  sezioni vuote, che con un progetto in mano non c'entrano niente.
+- CSS ([styles.css:285](app/styles.css#L285)): `.side-list.reorder` con sfondo d'accento al
+  6% e contorno tratteggiato, `.proj-grip`, `li.dragging` al 35% di opacità, cursore
+  `grab`/`grabbing`, `.lock-btn`. `#projectsGroup` passa da `min-height: 60px` a `96px`
+  (testata + una riga + lucchetto) e il lucchetto si nasconde col gruppo compresso.
+- README: paragrafo **Ordine dei progetti** in “Cosa sa fare”.
+
+### Non verificato a mano
+Come le fasi 6 e 7, il trascinamento va guardato a schermo: da provare il rilascio in
+testa e in coda all'elenco, il riordino con l'elenco più lungo della barra laterale
+(scorrimento automatico) e che a lucchetto chiuso un click su un progetto lo apra senza
+mai avviare un trascinamento.
 
 ---
 

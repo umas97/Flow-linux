@@ -62,7 +62,7 @@
       projects: [
         {
           id: pid, name: 'Benvenuto in Flow', color: '#6d5efc', icon: '🚀',
-          archived: false, view: 'board', createdAt: n,
+          archived: false, view: 'board', order: 1000, createdAt: n,
           sections: [
             { id: s1, name: 'Da fare', order: 1000 },
             { id: s2, name: 'In corso', order: 2000 },
@@ -71,7 +71,7 @@
         },
         {
           id: pid2, name: 'Casa', color: '#10b981', icon: '🏡',
-          archived: false, view: 'list', createdAt: n,
+          archived: false, view: 'list', order: 2000, createdAt: n,
           sections: [
             { id: 's_casa1', name: 'Questa settimana', order: 1000 },
             { id: 's_casa2', name: 'Prima o poi', order: 2000 }
@@ -131,17 +131,34 @@
     d.schema = SCHEMA;
     d.settings = Object.assign({
       theme: 'system', accent: '#6d5efc', density: 'comfortable',
-      startView: 'today', sidebarCollapsed: false, detailWidth: 440, detailAutoHide: true
+      startView: 'today', sidebarCollapsed: false, detailWidth: 440, detailAutoHide: true,
+      projectsLocked: true
     }, d.settings || {});
     // Larghezza del pannello dettagli: numero entro i limiti della maniglia.
     var dw = +d.settings.detailWidth;
     d.settings.detailWidth = isNaN(dw) ? 440 : Math.max(320, Math.min(720, Math.round(dw)));
     // Chiusura al click fuori: acceso salvo esplicito "false".
     d.settings.detailAutoHide = d.settings.detailAutoHide !== false;
+    // Riordino dei progetti: bloccato salvo esplicito "false".
+    d.settings.projectsLocked = d.settings.projectsLocked !== false;
     d.people = Array.isArray(d.people) ? d.people : [];
     d.tags = Array.isArray(d.tags) ? d.tags : [];
     d.projects = Array.isArray(d.projects) ? d.projects : [];
     d.tasks = Array.isArray(d.tasks) ? d.tasks : [];
+
+    /* Ordine dei progetti nella barra laterale. Chi non l'ha lo riceve dalla
+       propria posizione attuale nell'array, dopo il progetto che lo precede:
+       così al primo avvio dopo l'aggiornamento nessun progetto si muove. */
+    var lastOrder = 0;
+    d.projects.forEach(function (p, i) {
+      if (typeof p.order !== 'number' || isNaN(p.order)) {
+        p.order = Math.max(lastOrder, i * 1000) + 1000;
+      }
+      lastOrder = p.order;
+    });
+    // Array riallineato all'ordine visivo: d.projects[0] è davvero il primo
+    // progetto a schermo, e ci contano il recupero degli orfani e createTask.
+    d.projects.sort(function (a, b) { return a.order - b.order; });
 
     d.projects.forEach(function (p) {
       p.id = p.id || U.uid('p');
@@ -405,7 +422,17 @@
   };
 
   Store.activeProjects = function () {
-    return Store.state.projects.filter(function (p) { return !p.archived; });
+    return Store.state.projects.filter(function (p) { return !p.archived; })
+      .sort(function (a, b) { return a.order - b.order; });
+  };
+
+  /** Ordine da dare a un progetto nuovo: in fondo all'elenco. */
+  Store.nextProjectOrder = function () {
+    var max = 0;
+    Store.state.projects.forEach(function (p) {
+      if (typeof p.order === 'number' && p.order > max) max = p.order;
+    });
+    return max + 1000;
   };
 
   /** Progresso 0..1 di un progetto (attività completate / totali). */

@@ -211,12 +211,19 @@
         '</button>';
     }).join('');
 
-    U.$('#projectList').innerHTML = Store.activeProjects().map(function (p) {
+    // A lucchetto aperto i progetti si trascinano: il <li> è l'elemento
+    // trascinabile, così la presa vale su tutta la riga e non solo sulla maniglia.
+    var unlocked = !Store.state.settings.projectsLocked;
+    var list = U.$('#projectList');
+    list.classList.toggle('reorder', unlocked);
+    list.innerHTML = Store.activeProjects().map(function (p) {
       var active = App.ui.route.kind === 'project' && App.ui.route.id === p.id;
       var pr = Store.progress(p.id);
       var circ = 2 * Math.PI * 6;
-      return '<li><button class="proj-item' + (active ? ' active' : '') + '" data-act="nav" data-route="project" data-id="' + p.id + '" ' +
+      return '<li' + (unlocked ? ' draggable="true" data-projdrag="' + p.id + '"' : '') + '>' +
+        '<button class="proj-item' + (active ? ' active' : '') + '" data-act="nav" data-route="project" data-id="' + p.id + '" ' +
         'data-ctx="project" style="--pc:' + p.color + '">' +
+        (unlocked ? '<span class="proj-grip">' + icon('grip', 'sm') + '</span>' : '') +
         (p.icon ? '<span class="proj-emoji">' + U.esc(p.icon) + '</span>'
           : '<span class="proj-dot" style="--pc:' + p.color + '"></span>') +
         '<span class="nav-label">' + U.esc(p.name) + '</span>' +
@@ -225,6 +232,13 @@
         'stroke-dashoffset="' + (circ * (1 - pr.ratio)).toFixed(1) + '" stroke-linecap="round"></circle></svg>' +
         '</button></li>';
     }).join('') || '<li style="padding:6px 10px;font-size:12.5px;color:var(--text-3)">Nessun progetto</li>';
+
+    // Lucchetto in fondo all'elenco: apre e chiude il riordino.
+    U.$('#projectsLock').innerHTML =
+      '<button class="lock-btn' + (unlocked ? ' on' : '') + '" data-act="toggle-projects-lock" title="' +
+      (unlocked ? 'Blocca il riordino dei progetti' : 'Sblocca il riordino dei progetti') + '">' +
+      icon(unlocked ? 'unlock' : 'lock', 'sm') +
+      '<span>' + (unlocked ? 'Riordino attivo' : 'Riordina progetti') + '</span></button>';
 
     var counts = {};
     Store.state.tasks.forEach(function (x) {

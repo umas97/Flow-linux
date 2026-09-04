@@ -255,6 +255,7 @@
             Store.commit('nuovo progetto', function (st) {
               st.projects.push({
                 id: id, name: name, color: color, icon: emoji, archived: false, view: 'board',
+                order: Store.nextProjectOrder(), // in fondo all'elenco
                 createdAt: new Date().toISOString(),
                 sections: [
                   { id: U.uid('s'), name: 'Da fare', order: 1000 },
@@ -883,6 +884,16 @@
         return Views.sidebar();
       }
 
+      // Preferenza d'interfaccia: fuori dalla cronologia annulla/ripristina.
+      case 'toggle-projects-lock': {
+        Store.quiet(function (st) { st.settings.projectsLocked = !st.settings.projectsLocked; });
+        Views.sidebar();
+        return App.toast(Store.state.settings.projectsLocked
+          ? 'Riordino dei progetti bloccato'
+          : 'Riordino dei progetti attivo: trascina i progetti',
+          Store.state.settings.projectsLocked ? 'lock' : 'unlock');
+      }
+
       case 'theme':
         return App.setTheme(el.dataset.theme);
 
@@ -1274,9 +1285,22 @@
    * TRASCINAMENTO
    * ================================================================== */
 
-  var drag = { id: null, line: null, zone: null, afterId: null };
+  var drag = { id: null, projId: null, line: null, zone: null, afterId: null };
 
   document.addEventListener('dragstart', function (e) {
+    // Progetti della barra laterale: il <li> porta data-projdrag solo a
+    // lucchetto aperto, quindi da bloccato non parte nessun trascinamento.
+    var pnode = e.target.closest('[data-projdrag]');
+    if (pnode) {
+      drag.projId = pnode.dataset.projdrag;
+      drag.id = null; drag.zone = null; drag.afterId = null;
+      pnode.classList.add('dragging');
+      document.body.classList.add('is-dragging-proj');
+      e.dataTransfer.effectAllowed = 'move';
+      try { e.dataTransfer.setData('text/plain', drag.projId); } catch (err) {}
+      return;
+    }
+
     var node = e.target.closest('[data-task]');
     if (!node) return;
     drag.id = node.dataset.task;
@@ -1295,8 +1319,9 @@
     U.$$('.dragging').forEach(function (n) { n.classList.remove('dragging'); });
     U.$$('.drop-active').forEach(function (n) { n.classList.remove('drop-active'); });
     if (drag.line) { drag.line.remove(); drag.line = null; }
-    drag.id = null; drag.zone = null; drag.afterId = null;
+    drag.id = null; drag.projId = null; drag.zone = null; drag.afterId = null;
     document.body.classList.remove('is-dragging');
+    document.body.classList.remove('is-dragging-proj');
     edgeStop();
   }
 
@@ -1318,8 +1343,8 @@
     return !!(s && s.sort && s.sort !== 'manual');
   }
 
-  function afterElement(container, y) {
-    var els = U.$$('[data-task]:not(.dragging)', container);
+  function afterElement(container, y, sel) {
+    var els = U.$$((sel || '[data-task]') + ':not(.dragging)', container);
     var best = null, bestDist = -Infinity;
     els.forEach(function (child) {
       var box = child.getBoundingClientRect();
@@ -1330,6 +1355,7 @@
   }
 
   document.addEventListener('dragover', function (e) {
+    if (drag.projId) return projectDragOver(e);
     if (!drag.id) return;
 
     var day = e.target.closest('[data-day]');
@@ -1372,6 +1398,7 @@
   });
 
   document.addEventListener('drop', function (e) {
+    if (drag.projId) return projectDrop(e);
     if (!drag.id) return;
     var id = drag.id;
 
@@ -1449,6 +1476,66 @@
       .forEach(function (t, i) { t.order = (i + 1) * 1000; });
   }
 
+  /* ---------------- riordino dei progetti (barra laterale) ---------------- *
+     Stesso meccanismo delle attività: la linea di inserimento dice dove si
+     finisce, l'ordine si calcola sul modello e non sul DOM.                  */
+
+  function projectDragOver(e) {
+    var list = e.target.closest('#projectList');
+    if (!list) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+
+    var after = afterElement(list, e.clientY, '[data-projdrag]');
+    drag.afterId = after ? after.dataset.projdrag : null;
+
+    // Un <li>, non un <div>: l'elenco dei progetti è una lista.
+    if (!drag.line) drag.line = U.el('li', { class: 'drop-line' });
+    if (after) list.insertBefore(drag.line, after);
+    else list.appendChild(drag.line);
+
+    edgeScroll(e);
+  }
+
+  function projectDrop(e) {
+    if (!e.target.closest('#projectList')) return;
+    e.preventDefault();
+
+    var id = drag.projId, refId = drag.afterId;
+    var moving = Store.state.projects.filter(function (p) { return p.id === id; })[0];
+    if (!moving) return;
+
+    // I vicini si cercano nel modello: i progetti archiviati non compaiono
+    // nell'elenco ma hanno comunque un "order" fra quelli visibili.
+    var siblings = Store.activeProjects().filter(function (p) { return p.id !== id; });
+    var idx = -1;
+    if (refId) {
+      siblings.forEach(function (p, i) { if (p.id === refId) idx = i; });
+    }
+    if (idx < 0) idx = siblings.length;
+
+    var before = idx > 0 ? siblings[idx - 1].order : null;
+    var after = idx < siblings.length ? siblings[idx].order : null;
+    var newOrder = U.orderBetween(before, after);
+
+    // Stessa difesa dalle collisioni delle attività: le medie ripetute
+    // avvicinano i valori fino a farli coincidere.
+    var tight = (before != null && Math.abs(newOrder - before) < 1) ||
+      (after != null && Math.abs(after - newOrder) < 1);
+
+    Store.commit('riordino progetti', function (st) {
+      moving.order = newOrder;
+      if (tight) {
+        st.projects.slice()
+          .sort(function (a, b) { return a.order - b.order; })
+          .forEach(function (p, i) { p.order = (i + 1) * 1000; });
+      }
+      // Array riallineato all'ordine visivo, come fa normalize().
+      st.projects.sort(function (a, b) { return a.order - b.order; });
+    });
+    App.render();
+  }
+
   /* ---------------- scorrimento automatico ai bordi ---------------- *
      Senza questo, con l'area di contenuto che dopo la fase 1 scorre davvero,
      un'attività non riesce a uscire dalla porzione visibile. Non basta stare su
@@ -1496,7 +1583,7 @@
   }
 
   function edgeStep() {
-    if (!drag.id) return edgeStop();
+    if (!drag.id && !drag.projId) return edgeStop();
     if (edge.v && edge.dy) edge.v.scrollTop += edge.dy;
     if (edge.h && edge.dx) edge.h.scrollLeft += edge.dx;
   }

@@ -127,6 +127,15 @@ per data e non sono interessate.
 Titolo, note in markdown leggero, scadenza, priorità, etichette colorate,
 assegnatario, sotto-attività con barra di avanzamento, duplicazione.
 
+**Ordine dei progetti**
+
+I progetti nella barra laterale si riordinano trascinandoli, ma solo dopo aver
+aperto il lucchetto: il pulsante **Riordina progetti**, in fondo all'elenco,
+attiva la modalità (l'elenco si colora leggermente e compare una maniglia su
+ogni riga). Un secondo click la richiude. Di partenza il riordino è **bloccato**,
+per non spostare un progetto per sbaglio mentre lo si apre. L'ordine viene
+salvato nell'archivio ed è annullabile con `Ctrl+Z`.
+
 **Etichette**
 
 Il pulsante `…` accanto a *ETICHETTE*, in fondo alla barra laterale, apre la
