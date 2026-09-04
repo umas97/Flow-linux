@@ -287,6 +287,8 @@
     var s = Store.section(t.projectId, t.sectionId);
     var person = Store.person(t.assignee);
     var subDone = t.subtasks.filter(function (x) { return x.done; }).length;
+    // Un'attività creata in questa sessione non è ancora passata da normalize.
+    var links = t.links || [];
 
     var dueCls = t.due && !t.done ? (U.diffDays(t.due) < 0 ? 'style="color:var(--p3)"'
       : U.diffDays(t.due) === 0 ? 'style="color:var(--p2)"' : '') : '';
@@ -351,6 +353,21 @@
       }).join('') + '</div>' +
       '<button class="quick-row" data-d="sub-add" style="min-height:32px;font-size:13px">' +
       icon('plus', 'sm') + 'Aggiungi sotto-attività</button>' +
+      '</div>' +
+
+      /* Collegamenti: gli stessi della scheda Note di un progetto, riquadri
+         compresi. Qui la delega è data-d, quindi i frammenti condivisi di
+         Views ricevono 'd' invece di 'act'. */
+      '<div class="dt-sec">' +
+      '<div class="dt-sec-head"><h4>Collegamenti</h4>' +
+      (links.length ? '<span class="col-count">' + links.length + '</span>' : '') +
+      (links.length > 1 ? Views.linkSortBtn(t, 'd') : '') + '</div>' +
+      (links.length ? '<div class="link-grid dt-links">' +
+        Views.sortLinks(links, t.linksSort).map(function (l) {
+          return Views.linkCard(l, 'd');
+        }).join('') + '</div>' : '') +
+      '<button class="quick-row" data-d="add-link" style="min-height:32px;font-size:13px">' +
+      icon('plus', 'sm') + 'Aggiungi collegamento</button>' +
       '</div>' +
 
       '<div class="dt-meta">' +
@@ -613,6 +630,26 @@
       return;
     }
 
+    /* Collegamenti dell'attività. La finestra, il menu e l'ordinamento sono
+       quelli della scheda Note: qui si passa solo chi li possiede. */
+    if (act === 'add-link') return App.links.modal(t, null);
+
+    if (act === 'open-link') {
+      var lk = App.links.of(t, el.dataset.id);
+      if (lk) App.links.open(lk);
+      return;
+    }
+
+    if (act === 'link-menu') {
+      // Il riquadro sotto il pulsante è a sua volta un data-d="open-link".
+      e.stopPropagation();
+      var lm = App.links.of(t, el.dataset.id);
+      if (lm) App.links.menu(el, t, lm);
+      return;
+    }
+
+    if (act === 'links-sort') return App.links.sortMenu(el, t);
+
     if (act === 'more') {
       return Menu.open(el, [
         {
@@ -625,6 +662,9 @@
               copy.done = false; copy.completedAt = null;
               copy.createdAt = copy.updatedAt = new Date().toISOString();
               copy.subtasks = copy.subtasks.map(function (s) { return { id: U.uid('st'), title: s.title, done: false }; });
+              copy.links = (copy.links || []).map(function (l) {
+                return Object.assign({}, l, { id: U.uid('l') });
+              });
               Store.state.tasks.push(copy);
               Detail.taskId = copy.id;
               App.ui.selectedTaskId = copy.id;

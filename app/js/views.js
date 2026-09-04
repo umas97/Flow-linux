@@ -69,6 +69,13 @@
     return '<span class="pill sub">' + icon('checkCircle') + done + '/' + t.subtasks.length + '</span>';
   }
 
+  function linkPill(t) {
+    var n = (t.links || []).length;
+    if (!n) return '';
+    return '<span class="pill" title="' + n + ' collegament' + (n === 1 ? 'o' : 'i') + '">' +
+      icon('link') + (n > 1 ? n : '') + '</span>';
+  }
+
   function avatar(personId, cls) {
     var p = Store.person(personId);
     if (!p) return '';
@@ -85,7 +92,7 @@
   V.card = function (t) {
     var cls = 'card' + (t.done ? ' done' : '') + (t.priority ? ' p' + t.priority : '') +
       (App.ui.selectedTaskId === t.id ? ' selected' : '');
-    var meta = duePill(t) + tagPills(t) + subPill(t) +
+    var meta = duePill(t) + tagPills(t) + subPill(t) + linkPill(t) +
       (t.notes ? '<span class="pill" title="Contiene note">' + icon('list') + '</span>' : '') +
       (t.assignee ? avatar(t.assignee) : '');
     return '<article class="' + cls + '" draggable="true" data-task="' + t.id + '" data-act="open-task" data-id="' + t.id + '">' +
@@ -692,29 +699,33 @@
 
   /* Un <div> e non un <button>: dentro c'e' il pulsante del menu, e un
      <button> annidato in un altro il parser HTML lo sposterebbe fuori.
-     La delega prende il [data-act] piu' interno, quindi il menu vince
-     sull'apertura del collegamento. */
-  function linkCard(l) {
+     La delega prende l'attributo piu' interno, quindi il menu vince
+     sull'apertura del collegamento.
+
+     Lo stesso riquadro serve la scheda Note di un progetto e il pannello di
+     un'attivita', che hanno due deleghe diverse: "at" e' il nome
+     dell'attributo, 'act' per il guscio e 'd' dentro il pannello. */
+  V.linkCard = function (l, at) {
     var info = V.kindInfo(l.kind);
-    return '<div class="link-card" data-act="open-link" ' +
+    return '<div class="link-card" data-' + at + '="open-link" ' +
       'data-id="' + l.id + '" style="--lc:' + l.color + '" ' +
       'title="' + U.esc(info.label) + ' · ' + U.esc(l.path) + '">' +
       '<span class="lk-ic">' + icon(info.ic) + '</span>' +
       '<span class="lk-body"><span class="lk-label">' + U.esc(l.label) + '</span>' +
       '<span class="lk-path">' + U.esc(l.path) + '</span></span>' +
-      '<button class="icon-btn tiny lk-more" data-act="link-menu" data-id="' + l.id + '" ' +
+      '<button class="icon-btn tiny lk-more" data-' + at + '="link-menu" data-id="' + l.id + '" ' +
       'title="Opzioni del collegamento">' + icon('more', 'sm') + '</button>' +
       '</div>';
-  }
+  };
 
   /** Selettore d'ordine dei collegamenti, gemello di sortBtn delle sezioni. */
-  function linkSortBtn(p) {
-    var info = V.linkSortInfo(p.linksSort);
+  V.linkSortBtn = function (o, at) {
+    var info = V.linkSortInfo(o.linksSort);
     var on = info.key !== 'manual';
-    return '<button class="sort-btn' + (on ? ' on' : '') + '" data-act="links-sort" ' +
+    return '<button class="sort-btn' + (on ? ' on' : '') + '" data-' + at + '="links-sort" ' +
       'title="Ordinamento: ' + U.esc(info.label) + '">' + icon(info.ic, 'sm') +
       (on ? '<span>' + U.esc(info.short) + '</span>' : '') + '</button>';
-  }
+  };
 
   V.notes = function (p) {
     var links = p.links || [];
@@ -732,12 +743,14 @@
       '<section class="np-block">' +
       '<div class="np-head"><h3>Collegamenti</h3>' +
       '<span class="col-count">' + links.length + '</span>' +
-      (links.length > 1 ? linkSortBtn(p) : '') +
+      (links.length > 1 ? V.linkSortBtn(p, 'act') : '') +
       '<button class="btn sm" data-act="add-link">' + icon('plus', 'sm') + 'Aggiungi collegamento</button>' +
       '</div>' +
       (links.length
         ? '<div class="link-grid">' +
-        V.sortLinks(links, p.linksSort).map(linkCard).join('') + '</div>'
+        V.sortLinks(links, p.linksSort).map(function (l) {
+          return V.linkCard(l, 'act');
+        }).join('') + '</div>'
         : emptyState('folder', 'Nessun collegamento',
           'Una cartella o un file sul disco si aprono nell’Esplora risorse, un indirizzo web nel browser.')) +
       '</section>' +

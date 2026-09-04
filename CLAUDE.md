@@ -169,6 +169,14 @@ work; it is mirrored into `localStorage['flow.route']` for the next launch.
   freezes it. A `url` link never touches the host: `window.open` is caught by
   `NewWindowRequested`, which hands it to the default browser, so web links also work
   with no host at all.
+  The same links live on a **task** (`task.links` / `task.linksSort`, rendered in the
+  detail panel under the subtasks): same shape, cleaned by the same `normalizeLinks()`,
+  and the same UI — the dialog, the menu, the sort menu and the card fragments are
+  exposed as `App.links` (`of`/`open`/`modal`/`menu`/`sortMenu`) and called with the task
+  in place of the project, so there is no second copy. `Views.linkCard(l, at)` and
+  `Views.linkSortBtn(o, at)` take the name of the delegation attribute (`act` in the
+  shell, `d` inside `#detail`). Whoever mutates a list calls `Store.touch(o)`, which
+  bumps `updatedAt` only if the owner has one (a task does, a project doesn't).
 - **One palette.** `COLORS` (24) and `EMOJIS` (48) at the top of
   [app.js](app/js/app.js) are the single source for projects, tags, links and the
   accent colour. There used to be four copied twelve-colour arrays that drifted

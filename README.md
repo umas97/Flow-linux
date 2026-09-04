@@ -195,6 +195,15 @@ finestra funzionano; è specchiata in `localStorage['flow.route']` per l'avvio s
   (trim + rimozione delle virgolette che aggiunge "Copia come percorso"). Un collegamento
   `url` non tocca mai l'host: `window.open` viene intercettato da `NewWindowRequested`,
   che lo passa al browser predefinito.
+- **Gli stessi collegamenti stanno sulle attività**: `task.links` / `task.linksSort`,
+  identici a quelli di un progetto e ripuliti dalla stessa `normalizeLinks()`. Non
+  esiste una seconda copia dell'interfaccia: finestra, menu, ordinamento e riquadri
+  sono quelli della scheda Note, esposti come `App.links`
+  (`of` / `open` / `modal` / `menu` / `sortMenu`) e chiamati dal pannello dettaglio con
+  l'attività al posto del progetto. `Views.linkCard(l, at)` e `Views.linkSortBtn(o, at)`
+  ricevono il nome dell'attributo di delega, `act` nel guscio e `d` dentro `#detail`.
+  Chi muta un elenco chiama `Store.touch(o)`: aggiorna `updatedAt` se chi possiede i
+  collegamenti ce l'ha (un'attività sì, un progetto no).
 - **Una sola tavolozza.** `COLORS` (24) e `EMOJIS` (48) in cima ad
   [app.js](app/js/app.js) sono l'unica fonte per progetti, etichette, collegamenti e
   colore principale. C'erano quattro array copiati da dodici colori che divergevano a ogni

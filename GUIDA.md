@@ -99,7 +99,8 @@ Da **Impostazioni → Apri cartella** arrivi al file in due clic.
   trascinamento.
 - **Calendario** — mese intero; trascina un'attività su un altro giorno per
   spostarne la scadenza.
-- **Note** — appunti del progetto e collegamenti a cartelle, file o siti web.
+- **Note** — appunti del progetto e collegamenti a cartelle, file o siti web
+  (gli stessi collegamenti li ha anche ogni attività, nel suo pannello).
 - **Prossimi 7 giorni**, **Tutte le attività**, **Completate**.
 
 Le quattro schede di un progetto si scelgono in alto a destra o coi tasti
@@ -138,14 +139,22 @@ per data e non sono interessate.
 **Attività**
 
 Titolo, note in markdown leggero, scadenza, priorità, etichette colorate,
-assegnatario, sotto-attività con barra di avanzamento, duplicazione.
+assegnatario, sotto-attività con barra di avanzamento, collegamenti a cartelle,
+file o siti web, duplicazione.
 
-**Note e collegamenti di un progetto**
+**Collegamenti**
 
-La quarta scheda di un progetto (tasto `4`) tiene due cose:
+Un collegamento è un pulsante colorato che apre una cartella, un file o un
+indirizzo web. Stanno in due posti, con le stesse regole e la stessa finestra:
 
-- gli **appunti** del progetto, in markdown leggero come le note di un'attività;
-- i **collegamenti**: pulsanti colorati di tre tipi.
+- nella scheda **Note** di un progetto (tasto `4`), sotto gli **appunti** del
+  progetto — anche loro in markdown leggero come le note di un'attività;
+- nel **pannello dei dettagli** di un'attività, sotto le sotto-attività.
+
+Sulle schede della bacheca un'attività che ne ha compare con la pastiglia 🔗 e
+il loro numero. Duplicando un'attività si duplicano anche i suoi collegamenti.
+
+I tipi sono tre:
 
 | Tipo | Un click | Come si inserisce |
 |------|----------|-------------------|
@@ -171,7 +180,8 @@ clic sulla pastiglia. Il pulsante `…` su un collegamento apre *Modifica*,
 
 Con più di un collegamento compare il selettore d'ordine accanto al contatore:
 *Ordine di inserimento* (predefinito), *Tipo* (cartelle, poi file, poi web) o
-*Nome A→Z*. La scelta è salvata nell'archivio.
+*Nome A→Z*. La scelta è salvata nell'archivio, e ogni progetto e ogni attività
+ha la sua.
 
 Cartelle e file servono l'Esplora risorse, quindi funzionano solo avviando
 `Flow.exe`: aprendo `app\index.html` nel browser si vedono, ma il click avvisa che

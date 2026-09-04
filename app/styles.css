@@ -933,6 +933,17 @@ body.is-dragging .column.drop-active .col-body.is-empty { border-color: var(--ac
 .dt-sec-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .dt-sec-head h4 { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: var(--text-3); flex: 1; }
 
+/* Collegamenti dell'attività: gli stessi riquadri della vista Note, ma la
+   colonna del pannello è stretta (320-720px) e la griglia che si sdoppia
+   taglierebbe i percorsi a metà. Uno per riga, e il pulsante del menu sempre
+   visibile: qui non c'è spazio per scoprirlo passandoci sopra. */
+.dt-links { grid-template-columns: 1fr; margin-bottom: 2px; }
+.dt-links .link-card { padding: 8px 6px 8px 10px; }
+.dt-links .lk-ic { width: 26px; height: 26px; border-radius: 7px; }
+.dt-links .lk-more { opacity: .55; }
+.dt-links .link-card:hover .lk-more { opacity: 1; }
+.dt-sec-head:hover .sort-btn { opacity: 1; }
+
 .notes-edit {
   width: 100%; min-height: 88px; resize: vertical;
   background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px;

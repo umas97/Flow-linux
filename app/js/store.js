@@ -118,9 +118,9 @@
     };
   }
 
-  /* Tipi di collegamento e criteri d'ordine della scheda Note. Come
-     SECTION_SORTS: duplicati di proposito, store.js e' caricato prima di
-     views.js e non puo' leggerli da Views. */
+  /* Tipi di collegamento e criteri d'ordine, di un progetto come di
+     un'attivita'. Come SECTION_SORTS: duplicati di proposito, store.js e'
+     caricato prima di views.js e non puo' leggerli da Views. */
   var LINK_KINDS = ['dir', 'file', 'url'];
   var LINK_SORTS = ['manual', 'kind', 'alpha'];
 
@@ -174,6 +174,34 @@
   // lasciare V.content senza niente da mostrare.
   var PROJECT_VIEWS = ['board', 'list', 'calendar', 'notes'];
 
+
+  /* I collegamenti stanno su un progetto (scheda Note) e su un'attivita'
+     (pannello dettaglio): stessa forma, stessa finestra, quindi anche stesso
+     controllo. fallback e' il colore di chi non ce l'ha. */
+  function normalizeLinks(o, fallback) {
+    if (LINK_SORTS.indexOf(o.linksSort) < 0) o.linksSort = 'manual';
+    o.links = (Array.isArray(o.links) ? o.links : [])
+      // Un collegamento senza percorso non porta in nessun posto: si scarta.
+      .filter(function (l) {
+        return l && typeof l.path === 'string' && Store.cleanPath(l.path).length;
+      })
+      .map(function (l) {
+        var path = Store.cleanPath(l.path);
+        // Il tipo dichiarato vince, ma un indirizzo web resta un indirizzo
+        // web anche se l'archivio dice altro: altrimenti /api/open ci
+        // proverebbe come se fosse un percorso su disco.
+        var kind = LINK_KINDS.indexOf(l.kind) < 0 ? 'dir' : l.kind;
+        if (URL_RE.test(path)) kind = 'url';
+        else if (kind === 'url') kind = 'dir';
+        return {
+          id: l.id || U.uid('l'),
+          path: path,
+          label: l.label || Store.pathLeaf(path),
+          color: l.color || fallback,
+          kind: kind
+        };
+      });
+  }
 
   function normalize(data) {
     var d = data && typeof data === 'object' ? data : {};
@@ -234,28 +262,7 @@
 
       // Scheda Note: appunti in markdown, collegamenti a cartelle, file o web.
       if (typeof p.notes !== 'string') p.notes = '';
-      if (LINK_SORTS.indexOf(p.linksSort) < 0) p.linksSort = 'manual';
-      p.links = (Array.isArray(p.links) ? p.links : [])
-        // Un collegamento senza percorso non porta in nessun posto: si scarta.
-        .filter(function (l) {
-          return l && typeof l.path === 'string' && Store.cleanPath(l.path).length;
-        })
-        .map(function (l) {
-          var path = Store.cleanPath(l.path);
-          // Il tipo dichiarato vince, ma un indirizzo web resta un indirizzo
-          // web anche se l'archivio dice altro: altrimenti /api/open ci
-          // proverebbe come se fosse un percorso su disco.
-          var kind = LINK_KINDS.indexOf(l.kind) < 0 ? 'dir' : l.kind;
-          if (URL_RE.test(path)) kind = 'url';
-          else if (kind === 'url') kind = 'dir';
-          return {
-            id: l.id || U.uid('l'),
-            path: path,
-            label: l.label || Store.pathLeaf(path),
-            color: l.color || p.color,
-            kind: kind
-          };
-        });
+      normalizeLinks(p, p.color);
     });
 
     var validProjects = {};
@@ -282,6 +289,9 @@
       if (p && !p.sections.some(function (s) { return s.id === t.sectionId; })) {
         t.sectionId = p.sections[0].id;
       }
+
+      // Collegamenti dell'attività: gli stessi della scheda Note del progetto.
+      normalizeLinks(t, (p && p.color) || d.settings.accent);
     });
 
     var tagIds = {};
@@ -433,6 +443,15 @@
     emit('change');
   };
 
+  /**
+   * Segna la modifica su chi la registra. Serve a chi cambia una cosa che vive
+   * sia su un progetto sia su un'attività — i collegamenti — senza dover
+   * sapere quale dei due ha in mano: un'attività ha updatedAt, un progetto no.
+   */
+  Store.touch = function (o) {
+    if (o && typeof o.updatedAt === 'string') o.updatedAt = new Date().toISOString();
+  };
+
   Store.canUndo = function () { return undoStack.length > 0; };
   Store.canRedo = function () { return redoStack.length > 0; };
 
@@ -542,6 +561,7 @@
       id: U.uid('t'), projectId: projectId, sectionId: sectionId,
       title: 'Nuova attività', notes: '', done: false, completedAt: null,
       due: null, priority: 0, tags: [], assignee: null, subtasks: [],
+      links: [], linksSort: 'manual',
       order: siblings.length ? minOrder - 1000 : 1000,
       createdAt: n, updatedAt: n
     }, fields);

@@ -1412,8 +1412,12 @@
    * SCHEDA NOTE: APPUNTI E COLLEGAMENTI
    * ================================================================== */
 
-  function linkOf(p, id) {
-    return (p.links || []).filter(function (l) { return l.id === id; })[0] || null;
+  /* Chi possiede l'elenco si chiama "o" in tutto il resto di questa sezione:
+     un progetto (scheda Note) o un'attivita' (pannello dettaglio). Le due
+     cose hanno gli stessi campi links/linksSort e passano dalla stessa
+     finestra, quindi qui non si distinguono. */
+  function linkOf(o, id) {
+    return (o.links || []).filter(function (l) { return l.id === id; })[0] || null;
   }
 
   /* Stesso gioco delle note di un'attivita': la vista markdown viene
@@ -1513,10 +1517,10 @@
     });
   }
 
-  function openLinkMenu(anchorEl, p, l) {
+  function openLinkMenu(anchorEl, o, l) {
     Menu.open(anchorEl, [
       { head: 'Collegamento' },
-      { ic: 'edit', label: 'Modifica', onClick: function () { linkModal(p, l); } },
+      { ic: 'edit', label: 'Modifica', onClick: function () { linkModal(o, l); } },
       {
         ic: 'copy', label: 'Copia percorso', onClick: function () {
           try { navigator.clipboard.writeText(l.path); App.toast('Percorso copiato', 'copy'); }
@@ -1524,17 +1528,17 @@
         }
       },
       { sep: true },
-      { ic: 'trash', label: 'Rimuovi', danger: true, onClick: function () { removeLink(p, l); } }
+      { ic: 'trash', label: 'Rimuovi', danger: true, onClick: function () { removeLink(o, l); } }
     ], { width: 220 });
   }
 
-  function openLinksSortMenu(anchorEl, p) {
+  function openLinksSortMenu(anchorEl, o) {
     Menu.open(anchorEl, [{ head: 'Ordina i collegamenti' }].concat(
-      Views.LINK_SORTS.map(function (o) {
+      Views.LINK_SORTS.map(function (s) {
         return {
-          ic: o.ic, label: o.label, on: (p.linksSort || 'manual') === o.key,
+          ic: s.ic, label: s.label, on: (o.linksSort || 'manual') === s.key,
           onClick: function () {
-            Store.commit('ordinamento collegamenti', function () { p.linksSort = o.key; });
+            Store.commit('ordinamento collegamenti', function () { o.linksSort = s.key; });
             App.render();
           }
         };
@@ -1542,9 +1546,10 @@
     ), { width: 230 });
   }
 
-  function removeLink(p, l) {
+  function removeLink(o, l) {
     Store.commit('collegamento rimosso', function () {
-      p.links = p.links.filter(function (x) { return x.id !== l.id; });
+      o.links = o.links.filter(function (x) { return x.id !== l.id; });
+      Store.touch(o);
     });
     App.render();
     App.toast('Collegamento rimosso', 'trash', true);
@@ -1554,7 +1559,7 @@
    * Finestra di un collegamento, la stessa per crearlo e per modificarlo.
    * Il percorso si mette in tre modi: selettore nativo, incolla, o a mano.
    */
-  function linkModal(p, existing) {
+  function linkModal(o, existing) {
     // Colore a caso e non quello del progetto: in una lista dove i collegamenti
     // hanno tutti lo stesso colore non si distingue niente a occhio.
     var color = (existing && existing.color) || U.pick(LINK_COLORS);
@@ -1669,7 +1674,7 @@
           if (existing) {
             U.$('[data-x="del"]', box).onclick = function () {
               Modal.close();
-              removeLink(p, existing);
+              removeLink(o, existing);
             };
           }
           U.$('[data-x="cancel"]', box).onclick = Modal.close;
@@ -1714,9 +1719,10 @@
                 existing.path = path; existing.label = label;
                 existing.color = color; existing.kind = kind;
               } else {
-                if (!Array.isArray(p.links)) p.links = [];
-                p.links.push({ id: U.uid('l'), path: path, label: label, color: color, kind: kind });
+                if (!Array.isArray(o.links)) o.links = [];
+                o.links.push({ id: U.uid('l'), path: path, label: label, color: color, kind: kind });
               }
+              Store.touch(o);
             });
             Modal.close();
             App.render();
@@ -1725,6 +1731,17 @@
       }
     );
   }
+
+  /* I collegamenti di un'attivita' sono gli stessi di un progetto: stessa
+     finestra, stesso menu, stesso ordinamento. Il pannello dettaglio li
+     chiama da qui invece di averne una seconda copia. */
+  App.links = {
+    of: linkOf,
+    open: openLink,
+    modal: linkModal,
+    menu: openLinkMenu,
+    sortMenu: openLinksSortMenu
+  };
 
   /* ================================================================== *
    * TRASCINAMENTO
