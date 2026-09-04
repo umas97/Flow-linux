@@ -16,7 +16,7 @@ Legenda stato: `da fare` · `in corso` · `fatto` · `rimandato`
 | 2 | 3 | Barra dei dettagli affiancata invece che sovrapposta | fatto | `styles.css`, `app.js`, `detail.js`, `store.js` |
 | 3 | 10 | Chiusura del pannello dettagli al click fuori, a scelta | fatto | `detail.js`, `app.js`, `store.js`, `README.md` |
 | 4 | 2 | Sposta sezione a destra / sinistra | fatto | `app.js`, `detail.js`, `icons.js`, `styles.css` |
-| 5 | 4 | Sotto-attività a capo automatico | da fare | `detail.js`, `styles.css` |
+| 5 | 4 | Sotto-attività a capo automatico | fatto | `detail.js`, `styles.css` |
 | 6 | 8 | Trascinamento attività (riordino e cambio sezione) | da fare | `app.js`, `styles.css` |
 | 7 | 6 | Ordinamenti per sezione | da fare | `views.js`, `app.js`, `store.js`, `styles.css`, `README.md` |
 | 8 | 5 | Riordino dei progetti + lucchetto | da fare | `views.js`, `app.js`, `store.js`, `index.html`, `styles.css` |
@@ -326,7 +326,7 @@ risulta attiva quando dovrebbe essere ferma e viceversa.
 ## Fase 5 · Sotto-attività a capo automatico
 <sub>richiesta 4</sub>
 
-**Stato:** da fare
+**Stato:** fatto
 
 ### Diagnosi
 Le sotto-attività sono `<input class="txt">`
@@ -348,10 +348,26 @@ Le attività normali invece vanno a capo perché `.card-title` ha
    `Shift+Enter` inserisce un ritorno a capo vero; `Esc` esce dal campo.
 5. `change` su `[data-d="sub-title"]` resta valido per i `<textarea>`.
 
-### Da confermare
-Anche `.row-title` della vista elenco taglia il titolo con i puntini
-([styles.css:589](app/styles.css#L589)). Non era nella richiesta: lo lascio così se non
-dici il contrario.
+### Fatto
+- `<input class="txt">` → `<textarea class="txt" rows="1">` con il valore nel corpo del tag
+  ([detail.js:348](app/js/detail.js#L348)). `U.esc` va bene anche lì dentro, e `change`
+  continua a fare `.trim()`, quindi nessun titolo comincia con un ritorno a capo (il
+  parser HTML mangerebbe il primo).
+- Altezza: `autoGrow` girava solo sul titolo. Ora gira su ogni sotto-attività a fine
+  `Detail.render` ([detail.js:369](app/js/detail.js#L369)) e sull'evento `input`
+  ([detail.js:626](app/js/detail.js#L626)), con lo stesso selettore del titolo.
+- Tastiera ([detail.js:652-656](app/js/detail.js#L652-L656)): `Invio` **senza** Maiusc
+  conferma e apre la sotto-attività successiva come prima; `Maiusc+Invio` inserisce un
+  ritorno a capo vero (l'evento passa e `input` fa crescere il campo); `Esc` esce.
+- CSS ([styles.css:824-840](app/styles.css#L824-L840)): `.sub-item` da
+  `align-items: center` a `flex-start`, `.sub-item .txt` con `resize: none`,
+  `overflow: hidden`, `line-height: 1.45`, `font-family: inherit`, `min-width: 0` e
+  `word-break: break-word`. `.sub-item .check` prende `margin-top: 3px` per restare
+  allineata alla prima riga di testo.
+
+### Lasciato come stava
+`.row-title` della vista elenco continua a tagliare il titolo con i puntini
+([styles.css:589](app/styles.css#L589)): non era nella richiesta.
 
 ---
 

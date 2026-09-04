@@ -822,12 +822,20 @@ html[data-theme="dark"] .theme-opt.active { background: var(--surface-hover); }
 
 .sub-list { display: flex; flex-direction: column; gap: 1px; }
 .sub-item {
-  display: flex; align-items: center; gap: 9px;
+  /* flex-start e non center: il titolo va a capo e spunta e cestino devono
+     restare allineati alla prima riga. */
+  display: flex; align-items: flex-start; gap: 9px;
   padding: 5px 8px; border-radius: 8px;
   transition: background .12s;
 }
 .sub-item:hover { background: var(--surface-2); }
-.sub-item .txt { flex: 1; font-size: 13px; background: none; border: 0; outline: 0; padding: 2px 0; }
+.sub-item .check { margin-top: 3px; }
+.sub-item .txt {
+  flex: 1; min-width: 0; font-size: 13px; line-height: 1.45;
+  background: none; border: 0; outline: 0; padding: 2px 0;
+  font-family: inherit; resize: none; overflow: hidden;
+  word-break: break-word;
+}
 .sub-item.done .txt { color: var(--text-3); text-decoration: line-through; }
 .sub-item .del { opacity: 0; color: var(--text-3); width: 22px; height: 22px; border-radius: 6px; display: grid; place-items: center; }
 .sub-item:hover .del { opacity: 1; }

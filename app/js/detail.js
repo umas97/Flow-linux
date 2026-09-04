@@ -345,7 +345,8 @@
       '<div class="sub-list">' + t.subtasks.map(function (st) {
         return '<div class="sub-item' + (st.done ? ' done' : '') + '" data-sub="' + st.id + '">' +
           '<button class="check' + (st.done ? ' on' : '') + '" data-d="sub-toggle" data-id="' + st.id + '">' + icon('check') + '</button>' +
-          '<input class="txt" value="' + U.esc(st.title) + '" data-d="sub-title" data-id="' + st.id + '">' +
+          '<textarea class="txt" rows="1" data-d="sub-title" data-id="' + st.id + '">' +
+          U.esc(st.title) + '</textarea>' +
           '<button class="del" data-d="sub-del" data-id="' + st.id + '">' + icon('trash', 'sm') + '</button></div>';
       }).join('') + '</div>' +
       '<button class="quick-row" data-d="sub-add" style="min-height:32px;font-size:13px">' +
@@ -365,6 +366,9 @@
     var host = U.$('#detail');
     host.innerHTML = html;
     autoGrow(U.$('.dt-title', host));
+    // Le sotto-attività nascono con rows="1": l'altezza va calcolata su quella
+    // effettiva del testo, altrimenti le righe in più restano nascoste.
+    U.$$('.sub-item .txt', host).forEach(function (ta) { autoGrow(ta); });
   };
 
   function autoGrow(ta) {
@@ -620,7 +624,7 @@
   });
 
   U.$('#detail').addEventListener('input', function (e) {
-    if (e.target.matches('.dt-title')) autoGrow(e.target);
+    if (e.target.matches('.dt-title, .sub-item .txt')) autoGrow(e.target);
   });
 
   U.$('#detail').addEventListener('change', function (e) {
@@ -646,7 +650,9 @@
       e.target.blur();
     }
     if (e.target.matches('[data-d="sub-title"]')) {
-      if (e.key === 'Enter') {
+      // Maiusc+Invio inserisce un ritorno a capo vero; Invio da solo conferma e
+      // apre la sotto-attività successiva, come prima del passaggio a textarea.
+      if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
         e.target.blur();
         var task = Store.task(Detail.taskId);
