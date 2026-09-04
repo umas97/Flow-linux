@@ -17,7 +17,7 @@ Legenda stato: `da fare` · `in corso` · `fatto` · `rimandato`
 | 3 | 10 | Chiusura del pannello dettagli al click fuori, a scelta | fatto | `detail.js`, `app.js`, `store.js`, `README.md` |
 | 4 | 2 | Sposta sezione a destra / sinistra | fatto | `app.js`, `detail.js`, `icons.js`, `styles.css` |
 | 5 | 4 | Sotto-attività a capo automatico | fatto | `detail.js`, `styles.css` |
-| 6 | 8 | Trascinamento attività (riordino e cambio sezione) | da fare | `app.js`, `styles.css` |
+| 6 | 8 | Trascinamento attività (riordino e cambio sezione) | fatto | `app.js`, `views.js`, `styles.css` |
 | 7 | 6 | Ordinamenti per sezione | da fare | `views.js`, `app.js`, `store.js`, `styles.css`, `README.md` |
 | 8 | 5 | Riordino dei progetti + lucchetto | da fare | `views.js`, `app.js`, `store.js`, `index.html`, `styles.css` |
 | 9 | 1 | Sezione Note per progetto con collegamenti a cartelle | da fare | `src/Flow.cs`, `views.js`, `app.js`, `store.js`, `styles.css`, `README.md` |
@@ -374,7 +374,7 @@ Le attività normali invece vanno a capo perché `.card-title` ha
 ## Fase 6 · Trascinamento delle attività
 <sub>richiesta 8</sub>
 
-**Stato:** da fare
+**Stato:** fatto
 
 ### Diagnosi
 Il meccanismo ([app.js:1191-1290](app/js/app.js#L1191-L1290)) funziona “a tratti” per
@@ -428,6 +428,51 @@ quattro motivi distinti:
    riordinare a mano”.
 8. Resta l'HTML5 drag & drop (funziona bene in WebView2 e regge già il calendario): non
    c'è motivo di riscrivere tutto con i pointer event.
+
+### Fatto
+Blocco `TRASCINAMENTO` di [app.js](app/js/app.js#L1250) riscritto (98 righe → 224).
+
+- **Ordine dal modello.** Il DOM serve solo a dire *davanti a quale attività* si è
+  rilasciato (`drag.afterId`, preso dall'ultimo `dragover`, cioè dove si vedeva la linea
+  di inserimento). Da lì si calcola l'indice fra i **fratelli dello stesso gruppo**
+  (aperte con aperte, completate con completate) presi dal modello e ordinati per `order`,
+  e `U.orderBetween` riceve la coppia giusta. Il caso che “sembrava non fare niente” —
+  rilascio in fondo con `before = 0` di una completata e `after = null`, che dava 1000 e
+  mandava l'attività in testa — non si può più presentare.
+- **Effetto collaterale positivo:** con i filtri attivi il DOM mostra un sottoinsieme,
+  ma i vicini si cercano nel modello completo, quindi l'attività finisce dove ci si
+  aspetta anche a filtri accesi. Prima no.
+- **Rilascio nella zona delle completate** → l'attività va in coda alle aperte
+  (`idx = siblings.length`), come previsto dal piano.
+- **Zone di rilascio colpibili.** `zoneAt()` risale a `.column` / `.list-section`, quindi
+  vale anche la testata della sezione e il pulsante “Aggiungi attività”. Le zone vuote
+  sono marcate `is-empty` da [views.js](app/js/views.js#L293) e, durante un
+  trascinamento (`body.is-dragging`), diventano un riquadro tratteggiato alto 46px con
+  la scritta “Trascina qui” ([styles.css:583-600](app/styles.css#L583-L600)). Nelle zone
+  vuote la linea di inserimento non compare: spezzerebbe il riquadro in due.
+- **Difesa dalle collisioni.** Se il nuovo `order` finisce a meno di 1 da un vicino, la
+  sezione viene rinumerata a passi di 1000 nella stessa `commit` (`renumberSection`,
+  ordine visivo conservato). Chiude anche l'`order: 0` già presente in `board.json`.
+- **Scorrimento automatico ai bordi**, verticale e orizzontale: `scroller()` trova il
+  primo antenato che scorre davvero sull'asse (quindi `.content` in vista elenco,
+  `.col-body` e `.board` in bacheca), velocità proporzionale alla vicinanza al bordo su
+  una fascia di 64px. Non basta agganciarsi a `dragover`: a puntatore fermo il browser lo
+  emette ogni 350ms e lo scorrimento andrebbe a scatti, quindi c'è un `setInterval` a
+  16ms che si spegne su `dragend`, `drop` e appena si esce dalla fascia.
+- **Presa**: `.row-grip` passa da `opacity: .6` a `1` all'hover, cursore `grabbing`
+  durante il trascinamento. Nessuna riga o scheda contiene campi di testo, quindi non
+  serviva togliere `draggable` da nulla.
+- **Aggancio alla fase 7** già presente: se la sezione di destinazione ha un
+  `sort` diverso da `manual` e non si sta cambiando sezione, compare l'avviso
+  “Ordinamento attivo: passa a Manuale per riordinare a mano” e l'ordine non viene
+  toccato. Finché la fase 7 non scrive `section.sort` il ramo è inerte.
+
+### Non verificato a mano
+Il trascinamento non si può provare da riga di comando: la logica dell'ordine è stata
+ricontrollata sui casi della diagnosi, ma **riquadri, evidenze e scorrimento automatico
+vanno guardati a schermo**. Da provare in particolare: rilascio in una sezione vuota,
+rilascio in fondo a una sezione che ha attività completate, trascinamento verso il bordo
+inferiore di una lista lunga e verso il bordo destro della bacheca.
 
 ---
 

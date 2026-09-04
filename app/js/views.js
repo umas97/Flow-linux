@@ -290,7 +290,8 @@
         '<span class="col-count">' + list.length + '</span>' +
         '<button class="icon-btn tiny" data-act="section-menu" data-id="' + s.id + '">' + icon('more') + '</button>' +
         '</div>' +
-        '<div class="col-body" data-drop="' + s.id + '">' + list.map(V.card).join('') + '</div>' +
+        '<div class="col-body' + (list.length ? '' : ' is-empty') + '" data-drop="' + s.id + '">' +
+        list.map(V.card).join('') + '</div>' +
         '<button class="col-add" data-act="add-task" data-section="' + s.id + '">' + icon('plus', 'sm') + 'Aggiungi attività</button>' +
         '</section>';
     }).join('');
@@ -316,7 +317,7 @@
         '<span class="col-count">' + list.length + '</span>' +
         '<button class="icon-btn tiny" data-act="section-menu" data-id="' + s.id + '">' + icon('more') + '</button>' +
         '</div>' +
-        '<div data-drop="' + s.id + '">' +
+        '<div class="drop-zone' + (list.length ? '' : ' is-empty') + '" data-drop="' + s.id + '">' +
         list.map(function (t) { return V.row(t, { grip: true, drag: true }); }).join('') +
         '</div>' +
         '<button class="quick-row" data-act="add-task" data-section="' + s.id + '">' + icon('plus', 'sm') + 'Aggiungi attività</button>' +

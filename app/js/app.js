@@ -1251,23 +1251,42 @@
    * TRASCINAMENTO
    * ================================================================== */
 
-  var drag = { id: null, line: null };
+  var drag = { id: null, line: null, zone: null, afterId: null };
 
   document.addEventListener('dragstart', function (e) {
     var node = e.target.closest('[data-task]');
     if (!node) return;
     drag.id = node.dataset.task;
+    drag.zone = null;
+    drag.afterId = null;
     node.classList.add('dragging');
+    // Serve al CSS per mostrare il riquadro tratteggiato delle sezioni vuote.
+    document.body.classList.add('is-dragging');
     e.dataTransfer.effectAllowed = 'move';
     try { e.dataTransfer.setData('text/plain', drag.id); } catch (err) {}
   });
 
-  document.addEventListener('dragend', function () {
+  document.addEventListener('dragend', endDrag);
+
+  function endDrag() {
     U.$$('.dragging').forEach(function (n) { n.classList.remove('dragging'); });
     U.$$('.drop-active').forEach(function (n) { n.classList.remove('drop-active'); });
     if (drag.line) { drag.line.remove(); drag.line = null; }
-    drag.id = null;
-  });
+    drag.id = null; drag.zone = null; drag.afterId = null;
+    document.body.classList.remove('is-dragging');
+    edgeStop();
+  }
+
+  /* La zona di rilascio di una sezione vale anche quando il puntatore sta sulla
+     testata o sul pulsante "Aggiungi attività": una sezione vuota era alta pochi
+     pixel e non si riusciva a centrarla. */
+  function zoneAt(el) {
+    if (!el || !el.closest) return null;
+    var zone = el.closest('[data-drop]');
+    if (zone) return zone;
+    var host = el.closest('.column, .list-section');
+    return host ? U.$('[data-drop]', host) : null;
+  }
 
   function afterElement(container, y) {
     var els = U.$$('[data-task]:not(.dragging)', container);
@@ -1289,22 +1308,36 @@
       U.$$('.drop-active').forEach(function (n) { if (n !== day) n.classList.remove('drop-active'); });
       day.classList.add('drop-active');
       if (drag.line) { drag.line.remove(); drag.line = null; }
+      drag.zone = null;
+      edgeScroll(e);
       return;
     }
 
-    var zone = e.target.closest('[data-drop]');
+    var zone = zoneAt(e.target);
     if (!zone) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
 
-    var col = zone.closest('.column');
-    U.$$('.column.drop-active').forEach(function (n) { if (n !== col) n.classList.remove('drop-active'); });
-    if (col) col.classList.add('drop-active');
+    // Evidenza: la colonna in bacheca, la zona stessa in vista elenco.
+    var mark = zone.closest('.column') || zone;
+    U.$$('.drop-active').forEach(function (n) { if (n !== mark) n.classList.remove('drop-active'); });
+    mark.classList.add('drop-active');
 
-    if (!drag.line) drag.line = U.el('div', { class: 'drop-line' });
     var after = afterElement(zone, e.clientY);
-    if (after) zone.insertBefore(drag.line, after);
-    else zone.appendChild(drag.line);
+    drag.zone = zone;
+    drag.afterId = after ? after.dataset.task : null;
+
+    // In una sezione vuota il riquadro tratteggiato dice già dove si finisce:
+    // la linea di inserimento lo spezzerebbe in due.
+    if (zone.classList.contains('is-empty')) {
+      if (drag.line) { drag.line.remove(); drag.line = null; }
+    } else {
+      if (!drag.line) drag.line = U.el('div', { class: 'drop-line' });
+      if (after) zone.insertBefore(drag.line, after);
+      else zone.appendChild(drag.line);
+    }
+
+    edgeScroll(e);
   });
 
   document.addEventListener('drop', function (e) {
@@ -1321,33 +1354,126 @@
       return;
     }
 
-    var zone = e.target.closest('[data-drop]');
+    // Zona e riferimento arrivano dall'ultimo dragover: sono esattamente il
+    // punto in cui si vedeva la linea di inserimento.
+    var zone = drag.zone, refId = drag.afterId;
+    if (!zone) {
+      zone = zoneAt(e.target);
+      var refEl = zone && afterElement(zone, e.clientY);
+      refId = refEl ? refEl.dataset.task : null;
+    }
     if (!zone) return;
     e.preventDefault();
 
-    var sectionId = zone.dataset.drop;
     var p = currentProject();
-    if (!p) return;
+    var moving = Store.task(id);
+    if (!p || !moving) return;
+    var sectionId = zone.dataset.drop;
 
-    // Ordine calcolato dai vicini nel DOM, con la linea di inserimento come riferimento.
-    var children = U.$$(':scope > *', zone);
-    var lineIndex = drag.line && drag.line.parentNode === zone
-      ? children.indexOf(drag.line) : children.length;
-    var before = null, after = null;
-    children.forEach(function (n, i) {
-      if (!n.dataset || !n.dataset.task || n.classList.contains('dragging')) return;
-      var t = Store.task(n.dataset.task);
-      if (!t) return;
-      if (i < lineIndex) before = t.order;
-      else if (after === null) after = t.order;
-    });
+    // Con un ordinamento di sezione diverso da "Manuale" il posto lo decide il
+    // criterio: riordinare a mano dentro la stessa sezione non avrebbe effetto.
+    var sec = Store.section(p.id, sectionId);
+    if (sec && sec.sort && sec.sort !== 'manual' &&
+      moving.projectId === p.id && moving.sectionId === sectionId) {
+      App.toast('Ordinamento attivo: passa a Manuale per riordinare a mano', 'alert');
+      return;
+    }
 
+    // L'ordine si calcola sul modello, non sul DOM: le completate stanno in
+    // fondo conservando il loro "order", quindi la sequenza lungo il DOM non è
+    // monotòna e U.orderBetween riceveva coppie incoerenti (es. 3000 e 0),
+    // facendo saltare l'attività in un punto qualunque.
+    var group = !!moving.done;
+    var siblings = Store.tasksOf(p.id).filter(function (t) {
+      return t.sectionId === sectionId && t.id !== id && !!t.done === group;
+    }).sort(function (a, b) { return a.order - b.order; });
+
+    // Rilasciata in fondo, o nella zona dell'altro gruppo: va in coda al proprio.
+    var ref = refId ? Store.task(refId) : null;
+    var idx = ref && !!ref.done === group ? siblings.indexOf(ref) : -1;
+    if (idx < 0) idx = siblings.length;
+
+    var before = idx > 0 ? siblings[idx - 1].order : null;
+    var after = idx < siblings.length ? siblings[idx].order : null;
     var newOrder = U.orderBetween(before, after);
+
+    // Difesa dalle collisioni: le medie ripetute avvicinano i valori fino a
+    // farli coincidere, e due attività con lo stesso "order" si scambiano di
+    // posto a ogni ridisegno. Costa una rinumerazione ogni molti spostamenti.
+    var tight = (before != null && Math.abs(newOrder - before) < 1) ||
+      (after != null && Math.abs(after - newOrder) < 1);
+
     Store.commit('spostamento', function () {
       Store.updateTask(id, { projectId: p.id, sectionId: sectionId, order: newOrder });
+      if (tight) renumberSection(p.id, sectionId);
     });
     App.render();
   });
+
+  /** Rinumera una sezione a passi di 1000 conservando l'ordine visivo. */
+  function renumberSection(projectId, sectionId) {
+    Store.tasksOf(projectId)
+      .filter(function (t) { return t.sectionId === sectionId; })
+      .sort(function (a, b) { return (a.done - b.done) || (a.order - b.order); })
+      .forEach(function (t, i) { t.order = (i + 1) * 1000; });
+  }
+
+  /* ---------------- scorrimento automatico ai bordi ---------------- *
+     Senza questo, con l'area di contenuto che dopo la fase 1 scorre davvero,
+     un'attività non riesce a uscire dalla porzione visibile. Non basta stare su
+     "dragover": a puntatore fermo il browser lo emette ogni 350ms, quindi lo
+     scorrimento andrebbe a scatti. Serve un timer proprio.                    */
+
+  var EDGE = 64, EDGE_MAX = 22;
+  var edge = { timer: null, v: null, dy: 0, h: null, dx: 0 };
+
+  /** Primo antenato che scorre davvero sull'asse richiesto. */
+  function scroller(el, axis) {
+    for (var n = el; n && n !== document.body; n = n.parentElement) {
+      var ov = getComputedStyle(n)[axis === 'v' ? 'overflowY' : 'overflowX'];
+      if (ov !== 'auto' && ov !== 'scroll') continue;
+      if (axis === 'v' ? n.scrollHeight > n.clientHeight + 2
+        : n.scrollWidth > n.clientWidth + 2) return n;
+    }
+    return null;
+  }
+
+  // Velocità proporzionale a quanto si è dentro la fascia: al bordo è massima.
+  function edgeSpeed(dist) {
+    return Math.max(2, Math.round((1 - Math.max(0, dist) / EDGE) * EDGE_MAX));
+  }
+
+  function edgeScroll(e) {
+    edge.v = null; edge.dy = 0; edge.h = null; edge.dx = 0;
+
+    var v = scroller(e.target, 'v');
+    if (v) {
+      var rv = v.getBoundingClientRect();
+      if (e.clientY - rv.top < EDGE) { edge.v = v; edge.dy = -edgeSpeed(e.clientY - rv.top); }
+      else if (rv.bottom - e.clientY < EDGE) { edge.v = v; edge.dy = edgeSpeed(rv.bottom - e.clientY); }
+    }
+
+    var h = scroller(e.target, 'h');
+    if (h) {
+      var rh = h.getBoundingClientRect();
+      if (e.clientX - rh.left < EDGE) { edge.h = h; edge.dx = -edgeSpeed(e.clientX - rh.left); }
+      else if (rh.right - e.clientX < EDGE) { edge.h = h; edge.dx = edgeSpeed(rh.right - e.clientX); }
+    }
+
+    if (!edge.dy && !edge.dx) return edgeStop();
+    if (!edge.timer) edge.timer = setInterval(edgeStep, 16);
+  }
+
+  function edgeStep() {
+    if (!drag.id) return edgeStop();
+    if (edge.v && edge.dy) edge.v.scrollTop += edge.dy;
+    if (edge.h && edge.dx) edge.h.scrollLeft += edge.dx;
+  }
+
+  function edgeStop() {
+    if (edge.timer) { clearInterval(edge.timer); edge.timer = null; }
+    edge.v = null; edge.h = null; edge.dy = 0; edge.dx = 0;
+  }
 
   /* ================================================================== *
    * TASTIERA
