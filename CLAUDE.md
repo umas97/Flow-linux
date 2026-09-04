@@ -193,5 +193,8 @@ work; it is mirrored into `localStorage['flow.route']` for the next launch.
   and the released zips under `dist/` were removed in phase 10. The storage logic in
   `Flow.cs` is a direct translation of that server's `server.js`; if you ever need to see
   the original, it is in history — `git show db0942b:vecchio-avvio-server/server.js`.
-- [README.md](README.md) is end-user documentation in Italian and doubles as the spec for
+- [GUIDA.md](GUIDA.md) is end-user documentation in Italian and doubles as the spec for
   shortcuts, views and backup rules — update it when you change any of them.
+  [README.md](README.md) is the repository's technical overview (what GitHub shows):
+  architecture, endpoints, conventions — a condensed version of this file, also in
+  Italian; keep the two in step.
