@@ -171,6 +171,11 @@
     };
   }
 
+  /** Un elemento a caso da una lista. */
+  function pick(list) {
+    return list[Math.floor(Math.random() * list.length)];
+  }
+
   /** Ordinamento stabile con chiavi frazionarie per il drag & drop. */
   function orderBetween(before, after) {
     if (before == null && after == null) return 1000;
@@ -184,6 +189,6 @@
     humanDate: humanDate, longDate: longDate, startOfWeek: startOfWeek, relativeTime: relativeTime,
     MONTHS: MONTHS, MONTHS_SHORT: MONTHS_SHORT, DAYS: DAYS, DAYS_SHORT: DAYS_SHORT,
     esc: esc, miniMarkdown: miniMarkdown, initials: initials, hashHue: hashHue, bytes: bytes,
-    $: $, $$: $$, el: el, debounce: debounce, orderBetween: orderBetween
+    $: $, $$: $$, el: el, debounce: debounce, pick: pick, orderBetween: orderBetween
   };
 })(window);

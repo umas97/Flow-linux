@@ -1555,7 +1555,9 @@
    * Il percorso si mette in tre modi: selettore nativo, incolla, o a mano.
    */
   function linkModal(p, existing) {
-    var color = (existing && existing.color) || p.color;
+    // Colore a caso e non quello del progetto: in una lista dove i collegamenti
+    // hanno tutti lo stesso colore non si distingue niente a occhio.
+    var color = (existing && existing.color) || U.pick(LINK_COLORS);
     var kind = (existing && existing.kind) || 'dir';
     // L'etichetta segue il percorso finche' non la si scrive a mano; su un
     // collegamento che esiste gia' e' roba dell'utente e non si tocca.

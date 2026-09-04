@@ -164,8 +164,10 @@ selettore la scelta diventa tua e il tipo non si muove più. Le virgolette di
 *Copia come percorso* dell'Esplora risorse le toglie da sé.
 
 L'etichetta è preimpostata col nome dell'ultima cartella, o col nome del sito per
-un indirizzo web, e si può cambiare come il colore. Il pulsante `…` su un
-collegamento apre *Modifica*, *Copia percorso* e *Rimuovi*.
+un indirizzo web. Il colore di un collegamento nuovo è preso a caso dalla
+tavolozza, così una lista di collegamenti si distingue a occhio: si cambia con un
+clic sulla pastiglia. Il pulsante `…` su un collegamento apre *Modifica*,
+*Copia percorso* e *Rimuovi*.
 
 Con più di un collegamento compare il selettore d'ordine accanto al contatore:
 *Ordine di inserimento* (predefinito), *Tipo* (cartelle, poi file, poi web) o
