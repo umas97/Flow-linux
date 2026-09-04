@@ -365,16 +365,36 @@
 
     var host = U.$('#detail');
     host.innerHTML = html;
-    autoGrow(U.$('.dt-title', host));
-    // Le sotto-attività nascono con rows="1": l'altezza va calcolata su quella
-    // effettiva del testo, altrimenti le righe in più restano nascoste.
-    U.$$('.sub-item .txt', host).forEach(function (ta) { autoGrow(ta); });
+    if (!FIELD_SIZING) growAllWhenStable(host);
   };
 
+  /* L'altezza delle textarea (titolo e sotto-attività, che nascono con
+     rows="1") la calcola il motore con field-sizing: content, così segue anche
+     le larghezze che cambiano. Solo dove non c'è si misura a mano. */
+  var FIELD_SIZING = !!(window.CSS && CSS.supports && CSS.supports('field-sizing', 'content'));
+
   function autoGrow(ta) {
-    if (!ta) return;
+    if (!ta || FIELD_SIZING) return;
     ta.style.height = 'auto';
     ta.style.height = ta.scrollHeight + 'px';
+  }
+
+  /* Misurare a mano vale solo a impaginazione fatta: in apertura la colonna del
+     pannello parte da zero e si allarga in 280ms, e su una colonna larga zero
+     il testo sta incolonnato una lettera per riga — il titolo veniva
+     altissimo. Si aspetta che la larghezza si sia fermata. */
+  function growAllWhenStable(host) {
+    var last = -1;
+    (function tick() {
+      var w = host.clientWidth;
+      if (w > 0 && w === last) {
+        autoGrow(U.$('.dt-title', host));
+        U.$$('.sub-item .txt', host).forEach(function (ta) { autoGrow(ta); });
+        return;
+      }
+      last = w;
+      requestAnimationFrame(tick);
+    })();
   }
 
   /* ---------------- chiusura al click fuori ---------------- */

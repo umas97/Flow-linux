@@ -105,6 +105,12 @@ assigning `innerHTML`; `renderContent()` saves and restores `scrollTop/scrollLef
 and `isEditingInDetail()` skips re-rendering the detail panel while a text field there has
 focus (a focused `<button>` must *not* block it — that used to leave stale data on screen).
 
+The detail panel's textareas (task title, subtasks) are sized by CSS `field-sizing:
+content`, not by JS: measuring `scrollHeight` right after `innerHTML` landed in the
+middle of the panel column's 280 ms width animation, so the first open got a title box
+hundreds of pixels tall. `autoGrow()` in `detail.js` survives only as the fallback for a
+runtime without `field-sizing`, and there it waits for the panel width to stop changing.
+
 All interaction is event delegation on `document`, keyed by data attributes:
 `data-act` for the app shell ([app.js:835](app/js/app.js#L835)) and `data-d` inside the
 detail panel ([detail.js:347](app/js/detail.js#L347)). New UI = emit the attribute, add a
