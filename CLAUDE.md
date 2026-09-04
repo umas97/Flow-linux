@@ -147,9 +147,15 @@ work; it is mirrored into `localStorage['flow.route']` for the next launch.
   [index.html](app/index.html#L9-L21) re-reads `localStorage['flow.prefs']` before first
   paint to avoid a flash; any new setting that affects first paint must be mirrored there
   *and* in `Store.savePrefs()`.
-- **Project tabs.** `project.view` is one of `board` / `list` / `calendar` / `notes`,
-  validated in `normalize()` — an unknown value falls back to `board` rather than
-  leaving `V.content` with nothing to render.
+- **Project tabs.** `project.view` is one of `board` / `list` / `calendar` / `notes`
+  (the list with icons and labels is `Views.PROJECT_VIEWS`, used by the topbar, the
+  settings and the `1`-`4` shortcuts), validated in `normalize()` — an unknown value
+  falls back to `board` rather than leaving `V.content` with nothing to render.
+  Nothing reads `project.view` directly: `App.projectView(p)` / `App.setProjectView`
+  do, because with `settings.rememberProjectView` off the tab lives in
+  `App.ui.tempView` (cleared by `App.go`, never persisted) and every project opens on
+  `settings.defaultProjectView` — so turning the option back on finds the remembered
+  tabs untouched.
 - **Project notes and links.** The Notes tab holds `project.notes` (markdown),
   `project.links` (`{ id, path, label, color, kind }`, `kind` being `dir` / `file` /
   `url`) and `project.linksSort` (`manual` / `kind` / `alpha`). `normalize()` keeps

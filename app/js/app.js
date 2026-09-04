@@ -13,7 +13,10 @@
       calMonth: U.today().slice(0, 7),
       selectedTaskId: null,
       collapsed: { projects: false, tags: false },
-      sidebarCollapsed: false
+      sidebarCollapsed: false,
+      // Scheda del progetto in corso di visita quando le schede non si
+      // ricordano: vive quanto la visita e non finisce nell'archivio.
+      tempView: null
     }
   };
   global.App = App;
@@ -121,6 +124,7 @@
   App.go = function (kind, id) {
     App.ui.route = { kind: kind, id: id || null };
     App.ui.calMonth = U.today().slice(0, 7);
+    App.ui.tempView = null;
     try { localStorage.setItem('flow.route', JSON.stringify(App.ui.route)); } catch (e) {}
     var h = routeToHash(App.ui.route);
     if (location.hash !== h) location.hash = h;
@@ -224,6 +228,24 @@
   function currentProject() {
     return App.ui.route.kind === 'project' ? Store.project(App.ui.route.id) : null;
   }
+
+  /* Quale scheda mostrare in un progetto, e dove finisce il cambio.
+     Con settings.rememberProjectView la scelta sta nel progetto e si ritrova
+     al ritorno; senza, ogni progetto si apre sulla scheda predefinita e il
+     cambio vale solo per la visita in corso (App.ui.tempView, azzerata da
+     App.go). Cosi' spegnendo e riaccendendo l'opzione le schede ricordate
+     non si perdono. */
+  App.projectView = function (p) {
+    var s = Store.state.settings;
+    if (s.rememberProjectView) return p.view;
+    return App.ui.tempView || s.defaultProjectView;
+  };
+
+  App.setProjectView = function (p, v) {
+    if (Store.state.settings.rememberProjectView) Store.quiet(function () { p.view = v; });
+    else App.ui.tempView = v;
+    App.render();
+  };
 
   function defaultTarget() {
     var p = currentProject() || Store.activeProjects()[0];
@@ -574,6 +596,26 @@
       '<button data-v="fixed" class="' + (s.detailAutoHide ? '' : 'active') + '">Fisso</button>' +
       '</div></div>' +
 
+      '<div class="set-row"><div class="sp"><div class="nm">Schede dei progetti</div>' +
+      '<div class="ds">Se ricordare l\'ultima scheda aperta in ogni progetto</div></div>' +
+      '<div class="seg" id="stRememberView">' +
+      '<button data-v="remember" class="' + (s.rememberProjectView ? 'active' : '') + '">Ricorda</button>' +
+      '<button data-v="fixed" class="' + (s.rememberProjectView ? '' : 'active') + '">Sempre la stessa</button>' +
+      '</div></div>' +
+
+      // La scelta della scheda serve solo a chi non le ricorda: sta nascosta
+      // finche' non si passa a "Sempre la stessa".
+      '<div id="stDefaultViewRow" style="border-bottom:1px solid var(--border)"' +
+      (s.rememberProjectView ? ' hidden' : '') + '>' +
+      '<div class="set-row" style="border-bottom:0;padding-bottom:0"><div class="sp">' +
+      '<div class="nm">Scheda all\'apertura</div>' +
+      '<div class="ds">Quella con cui si apre ogni progetto</div></div></div>' +
+      '<div class="seg" id="stDefaultView" style="margin:8px 0 11px">' +
+      Views.PROJECT_VIEWS.map(function (v) {
+        return '<button data-v="' + v.id + '" class="' + (s.defaultProjectView === v.id ? 'active' : '') + '">' +
+          icon(v.ic, 'sm') + v.label + '</button>';
+      }).join('') + '</div></div>' +
+
       '<div class="set-row"><div class="sp"><div class="nm">Archivio dati</div>' +
       '<div class="ds" id="stWhere">…</div></div>' +
       '<button class="btn sm" data-x="reveal">' + icon('folder', 'sm') + 'Apri cartella</button></div>' +
@@ -617,6 +659,28 @@
             // Preferenza d'interfaccia: fuori dalla cronologia annulla/ripristina.
             Store.quiet(function (st) { st.settings.detailAutoHide = b.dataset.v === 'auto'; });
             U.$$('#stDetailHide button', box).forEach(function (x) { x.classList.toggle('active', x === b); });
+          };
+
+          U.$('#stRememberView', box).onclick = function (e) {
+            var b = e.target.closest('[data-v]'); if (!b) return;
+            var remember = b.dataset.v === 'remember';
+            Store.quiet(function (st) { st.settings.rememberProjectView = remember; });
+            U.$$('#stRememberView button', box).forEach(function (x) { x.classList.toggle('active', x === b); });
+            U.$('#stDefaultViewRow', box).hidden = remember;
+            // Tornando a "Ricorda" la scheda della visita in corso non conta
+            // piu': la mostra il progetto.
+            App.ui.tempView = null;
+            App.render();
+          };
+
+          U.$('#stDefaultView', box).onclick = function (e) {
+            var b = e.target.closest('[data-v]'); if (!b) return;
+            Store.quiet(function (st) { st.settings.defaultProjectView = b.dataset.v; });
+            U.$$('#stDefaultView button', box).forEach(function (x) { x.classList.toggle('active', x === b); });
+            // Si vede subito: la scheda scelta diventa anche quella mostrata
+            // adesso, al posto di quella su cui si era arrivati.
+            App.ui.tempView = null;
+            App.render();
           };
 
           box.querySelector('[data-x="export"]').onclick = App.exportData;
@@ -990,8 +1054,7 @@
       case 'set-view': {
         var p = currentProject();
         if (!p) return;
-        Store.quiet(function () { p.view = el.dataset.view; });
-        return App.render();
+        return App.setProjectView(p, el.dataset.view);
       }
 
       /* ---- scheda Note del progetto ---- */
@@ -1189,7 +1252,8 @@
     // divergono dopo il primo spostamento.
     var sorted = p.sections.slice().sort(function (a, b) { return a.order - b.order; });
     var idx = sorted.findIndex(function (s) { return s.id === sectionId; });
-    var giu = p.view === 'list'; // in vista elenco le sezioni stanno una sotto l'altra
+    // In vista elenco le sezioni stanno una sotto l'altra.
+    var giu = App.projectView(p) === 'list';
     Menu.open(anchor, [
       { label: 'Aggiungi attività', ic: 'plus', onClick: function () { App.createTaskInline(p.id, sectionId); } },
       {
@@ -2043,9 +2107,8 @@
     if (App.ui.route.kind === 'project' && ['1', '2', '3', '4'].indexOf(e.key) >= 0) {
       var p = currentProject();
       if (!p) return;
-      var v = { '1': 'board', '2': 'list', '3': 'calendar', '4': 'notes' }[e.key];
-      Store.quiet(function () { p.view = v; });
-      return App.render();
+      var v = Views.PROJECT_VIEWS[+e.key - 1];
+      return App.setProjectView(p, v.id);
     }
   });
 

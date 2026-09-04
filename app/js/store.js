@@ -183,7 +183,7 @@
     d.settings = Object.assign({
       theme: 'system', accent: '#6d5efc', density: 'comfortable',
       startView: 'today', sidebarCollapsed: false, detailWidth: 440, detailAutoHide: true,
-      projectsLocked: true
+      projectsLocked: true, rememberProjectView: true, defaultProjectView: 'board'
     }, d.settings || {});
     // Larghezza del pannello dettagli: numero entro i limiti della maniglia.
     var dw = +d.settings.detailWidth;
@@ -192,6 +192,12 @@
     d.settings.detailAutoHide = d.settings.detailAutoHide !== false;
     // Riordino dei progetti: bloccato salvo esplicito "false".
     d.settings.projectsLocked = d.settings.projectsLocked !== false;
+    // Schede dei progetti: si ricorda l'ultima salvo esplicito "false".
+    d.settings.rememberProjectView = d.settings.rememberProjectView !== false;
+    // Scheda su cui aprire un progetto quando non si ricorda l'ultima.
+    if (PROJECT_VIEWS.indexOf(d.settings.defaultProjectView) < 0) {
+      d.settings.defaultProjectView = 'board';
+    }
     d.people = Array.isArray(d.people) ? d.people : [];
     d.tags = Array.isArray(d.tags) ? d.tags : [];
     d.projects = Array.isArray(d.projects) ? d.projects : [];

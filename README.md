@@ -102,6 +102,18 @@ Da **Impostazioni → Apri cartella** arrivi al file in due clic.
 - **Note** — appunti del progetto e collegamenti a cartelle, file o siti web.
 - **Prossimi 7 giorni**, **Tutte le attività**, **Completate**.
 
+Le quattro schede di un progetto si scelgono in alto a destra o coi tasti
+`1` `2` `3` `4`. In **Impostazioni → Schede dei progetti** decidi cosa succede
+riaprendo un progetto:
+
+| Modo | Comportamento |
+|------|---------------|
+| Ricorda *(predefinito)* | ogni progetto si riapre sulla scheda che stavi guardando |
+| Sempre la stessa | ogni progetto si apre sulla scheda scelta in *Scheda all'apertura* — bacheca, elenco, calendario o note — e il cambio di scheda vale solo finché resti nel progetto |
+
+Passando da *Sempre la stessa* a *Ricorda* le schede ricordate prima tornano
+come erano: la scelta fissa non le sovrascrive.
+
 **Ordinamento delle sezioni**
 
 Ogni sezione ha il suo criterio, scelto col pulsante accanto al contatore (in

@@ -298,14 +298,9 @@
         '</div>' +
         '<span class="tb-sub">' + pr.done + '/' + pr.total + ' completate</span>';
 
-      var views = [
-        { id: 'board', ic: 'board', label: 'Bacheca' },
-        { id: 'list', ic: 'list', label: 'Elenco' },
-        { id: 'calendar', ic: 'calendar', label: 'Calendario' },
-        { id: 'notes', ic: 'file', label: 'Note' }
-      ];
-      right += '<div class="seg">' + views.map(function (v) {
-        return '<button data-act="set-view" data-view="' + v.id + '" class="' + (p.view === v.id ? 'active' : '') + '" ' +
+      var shown = App.projectView(p);
+      right += '<div class="seg">' + V.PROJECT_VIEWS.map(function (v) {
+        return '<button data-act="set-view" data-view="' + v.id + '" class="' + (shown === v.id ? 'active' : '') + '" ' +
           'title="' + v.label + '">' + icon(v.ic, 'sm') + '<span class="vlbl">' + v.label + '</span></button>';
       }).join('') + '</div>';
     } else {
@@ -640,6 +635,15 @@
    * Vista Note: appunti del progetto e collegamenti al disco
    * ------------------------------------------------------------------ */
 
+  /* Le schede di un progetto, in ordine: le usano il segmentato della barra in
+     alto, le impostazioni e le scorciatoie 1-4. Un elenco solo, come i colori. */
+  V.PROJECT_VIEWS = [
+    { id: 'board', ic: 'board', label: 'Bacheca' },
+    { id: 'list', ic: 'list', label: 'Elenco' },
+    { id: 'calendar', ic: 'calendar', label: 'Calendario' },
+    { id: 'notes', ic: 'file', label: 'Note' }
+  ];
+
   /* I tre tipi di collegamento, nell'ordine in cui li mette il criterio
      "Tipo": prima quello che sta sul disco, poi il web. */
   V.LINK_KINDS = [
@@ -750,9 +754,10 @@
     if (r.kind === 'project') {
       var p = Store.project(r.id);
       if (!p) { App.go('today'); return; }
-      body = p.view === 'list' ? V.list(p)
-        : p.view === 'calendar' ? V.calendar(p)
-          : p.view === 'notes' ? V.notes(p) : V.board(p);
+      var view = App.projectView(p);
+      body = view === 'list' ? V.list(p)
+        : view === 'calendar' ? V.calendar(p)
+          : view === 'notes' ? V.notes(p) : V.board(p);
     } else if (r.kind === 'today') {
       body = V.dashboard();
     } else {
