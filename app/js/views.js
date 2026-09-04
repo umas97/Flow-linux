@@ -294,7 +294,7 @@
       left = '<div class="tb-title">' +
         (p.icon ? '<span class="proj-emoji" style="font-size:19px" data-act="project-icon">' + U.esc(p.icon) + '</span>'
           : '<span class="proj-dot" style="--pc:' + p.color + ';width:11px;height:11px"></span>') +
-        '<input class="ttl" value="' + U.esc(p.name) + '" data-act="rename-project" size="' + Math.max(6, p.name.length) + '">' +
+        '<input class="ttl" value="' + U.esc(p.name) + '" data-act="rename-project">' +
         '</div>' +
         '<span class="tb-sub">' + pr.done + '/' + pr.total + ' completate</span>';
 
@@ -640,19 +640,76 @@
    * Vista Note: appunti del progetto e collegamenti al disco
    * ------------------------------------------------------------------ */
 
+  /* I tre tipi di collegamento, nell'ordine in cui li mette il criterio
+     "Tipo": prima quello che sta sul disco, poi il web. */
+  V.LINK_KINDS = [
+    { key: 'dir', label: 'Cartella', ic: 'folder' },
+    { key: 'file', label: 'File', ic: 'file' },
+    { key: 'url', label: 'Collegamento web', ic: 'globe' }
+  ];
+
+  V.kindInfo = function (key) {
+    return V.LINK_KINDS.filter(function (k) { return k.key === key; })[0] || V.LINK_KINDS[0];
+  };
+
+  function kindRank(l) {
+    for (var i = 0; i < V.LINK_KINDS.length; i++) {
+      if (V.LINK_KINDS[i].key === l.kind) return i;
+    }
+    return V.LINK_KINDS.length;
+  }
+
+  V.LINK_SORTS = [
+    { key: 'manual', label: 'Ordine di inserimento', short: '', ic: 'grip' },
+    { key: 'kind', label: 'Tipo', short: 'Tipo', ic: 'layers' },
+    { key: 'alpha', label: 'Nome A→Z', short: 'A→Z', ic: 'sortAz' }
+  ];
+
+  V.linkSortInfo = function (key) {
+    return V.LINK_SORTS.filter(function (s) { return s.key === key; })[0] || V.LINK_SORTS[0];
+  };
+
+  function byLabel(a, b) {
+    return a.label.localeCompare(b.label, 'it', { sensitivity: 'base', numeric: true });
+  }
+
+  /* Unico punto che ordina i collegamenti. "Manuale" e' l'ordine dell'array,
+     cioe' quello di inserimento: si lascia intatto invece di mettere un
+     comparatore che restituisce 0, cosi' e' evidente che non tocca niente. */
+  V.sortLinks = function (list, sort) {
+    if (sort === 'kind') {
+      return list.slice().sort(function (a, b) {
+        return (kindRank(a) - kindRank(b)) || byLabel(a, b);
+      });
+    }
+    if (sort === 'alpha') return list.slice().sort(byLabel);
+    return list.slice();
+  };
+
   /* Un <div> e non un <button>: dentro c'e' il pulsante del menu, e un
      <button> annidato in un altro il parser HTML lo sposterebbe fuori.
      La delega prende il [data-act] piu' interno, quindi il menu vince
      sull'apertura del collegamento. */
   function linkCard(l) {
-    return '<div class="link-card" data-act="open-link" data-id="' + l.id + '" ' +
-      'style="--lc:' + l.color + '" title="' + U.esc(l.path) + '">' +
-      '<span class="lk-ic">' + icon(l.kind === 'file' ? 'file' : 'folder') + '</span>' +
+    var info = V.kindInfo(l.kind);
+    return '<div class="link-card" data-act="open-link" ' +
+      'data-id="' + l.id + '" style="--lc:' + l.color + '" ' +
+      'title="' + U.esc(info.label) + ' · ' + U.esc(l.path) + '">' +
+      '<span class="lk-ic">' + icon(info.ic) + '</span>' +
       '<span class="lk-body"><span class="lk-label">' + U.esc(l.label) + '</span>' +
       '<span class="lk-path">' + U.esc(l.path) + '</span></span>' +
       '<button class="icon-btn tiny lk-more" data-act="link-menu" data-id="' + l.id + '" ' +
       'title="Opzioni del collegamento">' + icon('more', 'sm') + '</button>' +
       '</div>';
+  }
+
+  /** Selettore d'ordine dei collegamenti, gemello di sortBtn delle sezioni. */
+  function linkSortBtn(p) {
+    var info = V.linkSortInfo(p.linksSort);
+    var on = info.key !== 'manual';
+    return '<button class="sort-btn' + (on ? ' on' : '') + '" data-act="links-sort" ' +
+      'title="Ordinamento: ' + U.esc(info.label) + '">' + icon(info.ic, 'sm') +
+      (on ? '<span>' + U.esc(info.short) + '</span>' : '') + '</button>';
   }
 
   V.notes = function (p) {
@@ -671,12 +728,14 @@
       '<section class="np-block">' +
       '<div class="np-head"><h3>Collegamenti</h3>' +
       '<span class="col-count">' + links.length + '</span>' +
+      (links.length > 1 ? linkSortBtn(p) : '') +
       '<button class="btn sm" data-act="add-link">' + icon('plus', 'sm') + 'Aggiungi collegamento</button>' +
       '</div>' +
       (links.length
-        ? '<div class="link-grid">' + links.map(linkCard).join('') + '</div>'
+        ? '<div class="link-grid">' +
+        V.sortLinks(links, p.linksSort).map(linkCard).join('') + '</div>'
         : emptyState('folder', 'Nessun collegamento',
-          'Collega la cartella del progetto sul disco: un click la apre nell’Esplora risorse.')) +
+          'Una cartella o un file sul disco si aprono nell’Esplora risorse, un indirizzo web nel browser.')) +
       '</section>' +
 
       '</div>';

@@ -379,29 +379,36 @@
 
   /* ---------------- chiusura al click fuori ---------------- */
 
-  /* Con settings.detailAutoHide un click fuori dal pannello lo chiude, anche a
-     finestra larga con il pannello affiancato. La decisione è rimandata a fine
-     giro di gestori: se il click ha aperto un'altra attività, un menu, una
-     modale o la palette, il pannello non si chiude.
+  /* Con settings.detailAutoHide un click fuori dal pannello lo chiude — ma
+     soltanto se cade **nel vuoto**: il fondo della bacheca, di una colonna o
+     dell'elenco delle sezioni. Prima si chiudeva a ogni click che non fosse su
+     un'attività, quindi anche sulla barra laterale, sulla barra in alto, su un
+     pulsante o su una testata di sezione: il pannello sparive mentre si stava
+     facendo altro.
+
+     Il controllo è su `e.target` e **non** su `closest()`, ed è questo che lo
+     rende affidabile senza dover elencare le eccezioni: il fondo di una colonna
+     chiude, una scheda che ci sta sopra no, perché il bersaglio del click è la
+     scheda e non la colonna. Niente da aggiungere quando nasce un elemento
+     nuovo — a meno che non sia un'altra area vuota.
+
      Si ascolta "click" e non "mousedown": alla pressione del tasto il campo di
      testo del pannello non ha ancora perso il fuoco e il suo "change" — quello
      che salva titolo, note e sotto-attività — non è ancora partito. */
+  var VOID_AREAS = '#content, .board, .column, .col-body, .drop-zone, ' +
+    '.list-view, .list-section, .dash, .cal, .cal-grid, .notes-page';
+
+  /* Un click che serviva solo a chiudere un menu non deve chiudere anche il
+     pannello. Il menu se ne va già sul "mousedown", quindi quando arriva il
+     "click" Menu.node è nullo: bisogna annotarselo prima. */
+  var menuWasOpen = false;
+  document.addEventListener('mousedown', function () { menuWasOpen = !!Menu.node; }, true);
+
   document.addEventListener('click', function (e) {
     if (!Detail.isOpen() || !Store.state.settings.detailAutoHide) return;
-
-    // Il pannello, e tutto quello che gli appartiene ma vive in document.body.
-    if (e.target.closest('#detail, .menu, #modal, #palette, #toasts, #scrim')) return;
-    // Un'altra attività (scheda, riga, cella del calendario, spunta compresa):
-    // il pannello deve cambiare attività, non chiudersi.
-    if (e.target.closest('[data-task]')) return;
-
-    var before = Detail.taskId;
-    setTimeout(function () {
-      if (!Detail.isOpen() || Detail.taskId !== before) return;
-      // Qualcosa si è aperto a causa di questo click: non chiudere.
-      if (Menu.node || !U.$('#modal').hidden || !U.$('#palette').hidden) return;
-      Detail.close();
-    }, 0);
+    if (menuWasOpen) return;
+    if (!e.target.matches || !e.target.matches(VOID_AREAS)) return;
+    Detail.close();
   });
 
   /* ---------------- maniglia di ridimensionamento ---------------- */

@@ -118,13 +118,33 @@
     };
   }
 
+  /* Tipi di collegamento e criteri d'ordine della scheda Note. Come
+     SECTION_SORTS: duplicati di proposito, store.js e' caricato prima di
+     views.js e non puo' leggerli da Views. */
+  var LINK_KINDS = ['dir', 'file', 'url'];
+  var LINK_SORTS = ['manual', 'kind', 'alpha'];
+
+  // Un collegamento web si riconosce solo dallo schema: "www.qualcosa" puo'
+  // essere anche il nome di una cartella su una rete.
+  var URL_RE = /^https?:[/][/]/i;
+
+  /** Vero se la stringa e' un indirizzo web (http/https). */
+  Store.isUrl = function (v) { return URL_RE.test(String(v || '').trim()); };
+
   /**
-   * Ultimo segmento di un percorso Windows, usato come etichetta predefinita
-   * di un collegamento. Regola unica: la usano sia il selettore sia l'incolla.
-   * Su una radice resta la lettera del disco ("D:"), che almeno si riconosce.
+   * Etichetta predefinita di un collegamento. Regola unica: la usano il
+   * selettore, l'incolla e normalize.
+   * - indirizzo web: il nome del sito, che dice piu' dell'ultimo pezzo del
+   *   percorso ("example.com" invece di "index.html");
+   * - percorso: l'ultimo segmento; su una radice la lettera del disco ("D:").
    */
   Store.pathLeaf = function (path) {
-    var clean = String(path || '').trim().replace(/[\\/]+$/, '');
+    var raw = String(path || '').trim();
+    if (URL_RE.test(raw)) {
+      var host = raw.replace(URL_RE, '').split(/[\/?#]/)[0];
+      return host.replace(/^www[.]/i, '') || raw;
+    }
+    var clean = raw.replace(/[\\/]+$/, '');
     if (!clean) return 'Collegamento';
     var parts = clean.split(/[\\/]/);
     return parts[parts.length - 1] || clean;
@@ -139,6 +159,7 @@
   // Schede di un progetto. Un valore ignoto torna alla bacheca invece di
   // lasciare V.content senza niente da mostrare.
   var PROJECT_VIEWS = ['board', 'list', 'calendar', 'notes'];
+
 
   function normalize(data) {
     var d = data && typeof data === 'object' ? data : {};
@@ -191,18 +212,25 @@
       if (PROJECT_VIEWS.indexOf(p.view) < 0) p.view = 'board';
       if (!p.createdAt) p.createdAt = n;
 
-      // Scheda Note: appunti in markdown e collegamenti a cartelle o file.
+      // Scheda Note: appunti in markdown, collegamenti a cartelle, file o web.
       if (typeof p.notes !== 'string') p.notes = '';
+      if (LINK_SORTS.indexOf(p.linksSort) < 0) p.linksSort = 'manual';
       p.links = (Array.isArray(p.links) ? p.links : [])
         // Un collegamento senza percorso non porta in nessun posto: si scarta.
         .filter(function (l) { return l && typeof l.path === 'string' && l.path.length; })
         .map(function (l) {
+          // Il tipo dichiarato vince, ma un indirizzo web resta un indirizzo
+          // web anche se l'archivio dice altro: altrimenti /api/open ci
+          // proverebbe come se fosse un percorso su disco.
+          var kind = LINK_KINDS.indexOf(l.kind) < 0 ? 'dir' : l.kind;
+          if (URL_RE.test(l.path)) kind = 'url';
+          else if (kind === 'url') kind = 'dir';
           return {
             id: l.id || U.uid('l'),
             path: l.path,
             label: l.label || Store.pathLeaf(l.path),
             color: l.color || p.color,
-            kind: l.kind === 'file' ? 'file' : 'dir'
+            kind: kind
           };
         });
     });

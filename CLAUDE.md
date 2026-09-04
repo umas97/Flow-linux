@@ -138,7 +138,17 @@ work; it is mirrored into `localStorage['flow.route']` for the next launch.
 - **Project tabs.** `project.view` is one of `board` / `list` / `calendar` / `notes`,
   validated in `normalize()` — an unknown value falls back to `board` rather than
   leaving `V.content` with nothing to render. The Notes tab holds `project.notes`
-  (markdown) and `project.links` (`{ id, path, label, color, kind }`).
+  (markdown), `project.links` (`{ id, path, label, color, kind }`, `kind` being
+  `dir` / `file` / `url`) and `project.linksSort` (`manual` / `kind` / `alpha`).
+  `normalize()` keeps `kind` and `path` consistent in both directions: an
+  `http(s)://` path is always `url`, and a `url` kind on a disk path is demoted —
+  otherwise `/api/open` would try a web address as a filesystem path. A `url` link
+  never touches the host: `window.open` is caught by `NewWindowRequested`, which
+  hands it to the default browser, so web links also work with no host at all.
+- **One palette.** `COLORS` (24) and `EMOJIS` (48) at the top of
+  [app.js](app/js/app.js) are the single source for projects, tags, links and the
+  accent colour. There used to be four copied twelve-colour arrays that drifted
+  apart on every edit — don't reintroduce a local literal.
 - **Quick add** ([app/js/parse.js](app/js/parse.js)) parses Italian natural language:
   dates (`oggi`, `ven`, `tra 3 giorni`, `12/03`, `12 marzo`), `!alta`, `#tag`, `@person`,
   `+project`. Tags and people named there are created on the fly by `Store.ensureTag` /

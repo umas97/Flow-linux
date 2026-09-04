@@ -19,6 +19,31 @@
   global.App = App;
 
   /* ================================================================== *
+   * TAVOLOZZE
+   *
+   * Una sola definizione per tutto: progetti, etichette, collegamenti e
+   * colore d'accento. Prima erano quattro elenchi copiati da dodici colori
+   * l'uno, che divergevano a ogni ritocco.
+   * 24 colori = quattro righe da sei nella griglia .swatches.
+   * ================================================================== */
+
+  var COLORS = [
+    '#ef4444', '#f97316', '#f59e0b', '#eab308', '#84cc16', '#22c55e',
+    '#10b981', '#14b8a6', '#06b6d4', '#0ea5e9', '#3b82f6', '#6366f1',
+    '#6d5efc', '#8b5cf6', '#a855f7', '#d946ef', '#ec4899', '#f43f5e',
+    '#b91c1c', '#0f766e', '#1d4ed8', '#7e22ce', '#78716c', '#64748b'
+  ];
+
+  // 48 icone = quattro righe da dodici. Raggruppate per ambito, cosi' si
+  // trovano a occhio: lavoro, casa, studio, tempo libero, viaggi, simboli.
+  var EMOJIS = [
+    '📁', '📂', '📋', '📌', '💼', '🏢', '🖥️', '⚙️', '🛠️', '🔧', '🧰', '📐',
+    '🏡', '🛋️', '🧹', '🍳', '🛒', '🌱', '🪴', '🐾', '🚗', '🚲', '✈️', '🧳',
+    '📚', '🎓', '📝', '🧠', '💡', '🔬', '🧩', '📷', '🎨', '🎸', '🎬', '🎮',
+    '🏋️', '⚽', '🏔️', '💰', '📈', '🎯', '🚀', '🔥', '⭐', '❤️', '⚡', '🌍'
+  ];
+
+  /* ================================================================== *
    * RENDERING
    * ================================================================== */
 
@@ -219,16 +244,15 @@
   };
 
   App.newProject = function () {
-    var colors = ['#6d5efc', '#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#ec4899', '#14b8a6', '#f97316', '#8b5cf6', '#64748b', '#0ea5e9', '#84cc16'];
-    var emojis = ['📁', '🚀', '🏡', '💼', '🎯', '📚', '💡', '🛠️', '🎨', '🏋️', '✈️', '🍳'];
+    var colors = COLORS, emojis = EMOJIS;
     Modal.open(
       '<div class="modal-head"><h2>Nuovo progetto</h2></div>' +
       '<div class="modal-body">' +
       '<div class="field"><label>Nome</label><input class="input" id="npName" placeholder="Es. Ristrutturazione casa" maxlength="60"></div>' +
-      '<div class="field"><label>Icona</label><div class="swatches" style="grid-template-columns:repeat(12,1fr)" id="npEmoji">' +
-      emojis.map(function (e, i) {
-        return '<button class="swatch" data-e="' + e + '" style="background:var(--surface-2);font-size:15px' +
-          (i === 0 ? '' : '') + '">' + e + '</button>';
+      '<div class="field"><label>Icona</label><div class="swatches emoji" id="npEmoji">' +
+      emojis.map(function (e) {
+        return '<button class="swatch" data-e="' + e + '" style="background:var(--surface-2);font-size:15px">' +
+          e + '</button>';
       }).join('') + '</div></div>' +
       '<div class="field"><label>Colore</label><div class="swatches" id="npColor">' +
       colors.map(function (c, i) {
@@ -283,8 +307,7 @@
 
   /* ---------------- gestione etichette ---------------- */
 
-  var TAG_COLORS = ['#ef4444', '#f97316', '#f59e0b', '#eab308', '#84cc16', '#10b981',
-    '#14b8a6', '#0ea5e9', '#3b82f6', '#6366f1', '#8b5cf6', '#ec4899'];
+  var TAG_COLORS = COLORS;
 
   function tagUsage(id) {
     return Store.state.tasks.filter(function (t) { return t.tags.indexOf(id) >= 0; }).length;
@@ -337,7 +360,7 @@
 
       if (btn.dataset.x === 'color') {
         var m = Menu.open(btn, [], {
-          width: 196,
+          width: 200,
           html: '<div class="menu-head">Colore</div><div class="swatches">' +
             TAG_COLORS.map(function (c) {
               return '<button class="swatch' + (c === g.color ? ' on' : '') + '" data-c="' + c + '" style="--c:' + c + '"></button>';
@@ -523,7 +546,7 @@
 
   App.settings = function () {
     var s = Store.state.settings;
-    var colors = ['#6d5efc', '#3b82f6', '#0ea5e9', '#10b981', '#84cc16', '#f59e0b', '#f97316', '#ef4444', '#ec4899', '#8b5cf6', '#14b8a6', '#64748b'];
+    var colors = COLORS;
 
     Modal.open(
       '<div class="modal-head">' + icon('settings') + '<h2>Impostazioni</h2>' +
@@ -989,6 +1012,12 @@
         return;
       }
 
+      case 'links-sort': {
+        var sp = currentProject();
+        if (sp) openLinksSortMenu(el, sp);
+        return;
+      }
+
       case 'link-menu': {
         e.stopPropagation();
         var mp = currentProject();
@@ -1239,7 +1268,7 @@
 
   function openProjectMenu(anchor, p) {
     if (!p) return;
-    var colors = ['#6d5efc', '#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#ec4899', '#14b8a6', '#f97316', '#8b5cf6', '#64748b', '#0ea5e9', '#84cc16'];
+    var colors = COLORS;
     var m = Menu.open(anchor, [
       {
         label: 'Rinomina', ic: 'edit', onClick: function () {
@@ -1295,12 +1324,11 @@
 
   function pickEmoji(anchor, p) {
     if (!p) return;
-    var emojis = ['📁', '🚀', '🏡', '💼', '🎯', '📚', '💡', '🛠️', '🎨', '🏋️', '✈️', '🍳',
-      '💰', '🎓', '🎸', '🌱', '🐾', '📷', '⚙️', '🧩', '❤️', '⭐', '🔥', '🧠'];
+    var emojis = EMOJIS;
     var m = Menu.open(anchor, [], {
-      width: 250,
+      width: 292,
       html: '<div class="menu-head">Icona del progetto</div>' +
-        '<div class="swatches" style="grid-template-columns:repeat(8,1fr)">' +
+        '<div class="swatches emoji">' +
         emojis.map(function (e) {
           return '<button class="swatch" data-em="' + e + '" style="background:var(--surface-2);font-size:15px">' + e + '</button>';
         }).join('') + '</div>' +
@@ -1370,13 +1398,26 @@
     return true;
   }
 
-  /* Un percorso incollato non dice se e' una cartella o un file: l'estensione
-     e' l'unico indizio. Il tipo resta correggibile a mano nella finestra. */
+  /* Un indirizzo web si riconosce dallo schema; un percorso incollato non dice
+     se e' una cartella o un file, e l'estensione e' l'unico indizio. Il tipo
+     resta correggibile a mano nella finestra. */
   function guessKind(path) {
-    return /[.][A-Za-z0-9]{1,8}$/.test(String(path).replace(/[\\/]+$/, '')) ? 'file' : 'dir';
+    var v = String(path).trim();
+    if (Store.isUrl(v)) return 'url';
+    return /[.][A-Za-z0-9]{1,8}$/.test(v.replace(/[\\/]+$/, '')) ? 'file' : 'dir';
   }
 
   function openLink(l) {
+    /* Un indirizzo web non passa dall'host: la finestra nuova e' intercettata
+       da NewWindowRequested, che apre il browser predefinito e non una finestra
+       di WebView2. Aprendo index.html in un browser normale e' una scheda,
+       quindi i collegamenti web funzionano anche senza Flow.exe. */
+    if (l.kind === 'url') {
+      try { window.open(l.path, '_blank', 'noopener'); }
+      catch (err) { App.toast('Non si apre: indirizzo non valido', 'alert'); }
+      return;
+    }
+
     if (needsHost()) return;
     fetch('/api/open', { method: 'POST', body: l.path }).then(function (r) {
       if (r.ok) return null;
@@ -1403,6 +1444,20 @@
     ], { width: 220 });
   }
 
+  function openLinksSortMenu(anchorEl, p) {
+    Menu.open(anchorEl, [{ head: 'Ordina i collegamenti' }].concat(
+      Views.LINK_SORTS.map(function (o) {
+        return {
+          ic: o.ic, label: o.label, on: (p.linksSort || 'manual') === o.key,
+          onClick: function () {
+            Store.commit('ordinamento collegamenti', function () { p.linksSort = o.key; });
+            App.render();
+          }
+        };
+      })
+    ), { width: 230 });
+  }
+
   function removeLink(p, l) {
     Store.commit('collegamento rimosso', function () {
       p.links = p.links.filter(function (x) { return x.id !== l.id; });
@@ -1426,17 +1481,21 @@
     Modal.open(
       '<div class="modal-head"><h2>' + (existing ? 'Modifica collegamento' : 'Nuovo collegamento') + '</h2></div>' +
       '<div class="modal-body">' +
-      '<div class="field"><label>Percorso</label>' +
-      '<input class="input mono" id="lkPath" spellcheck="false" placeholder="C:\Progetti\Casa" value="' +
-      (existing ? U.esc(existing.path) : '') + '"></div>' +
+      '<div class="field"><label>Percorso o indirizzo</label>' +
+      '<input class="input mono" id="lkPath" spellcheck="false" ' +
+      'placeholder="C:\\Progetti\\Casa   oppure   https://esempio.it" value="' +
+      (existing ? U.esc(existing.path) : '') + '">' +
+      '<div class="hint">Un indirizzo web si incolla e basta: per quello non c\'e\' selettore.</div></div>' +
       '<div class="field"><div class="lk-browse">' +
       '<button class="btn sm" data-x="pick-dir">' + icon('folder', 'sm') + 'Scegli cartella\u2026</button>' +
       '<button class="btn sm" data-x="pick-file">' + icon('file', 'sm') + 'Scegli file\u2026</button>' +
       '</div></div>' +
       '<div class="field"><label>Tipo</label><div class="seg" id="lkKind">' +
-      '<button data-v="dir">Cartella</button><button data-v="file">File</button></div></div>' +
+      Views.LINK_KINDS.map(function (k) {
+        return '<button data-v="' + k.key + '">' + icon(k.ic, 'sm') + U.esc(k.label) + '</button>';
+      }).join('') + '</div></div>' +
       '<div class="field"><label>Etichetta</label>' +
-      '<input class="input" id="lkLabel" maxlength="40" placeholder="Nome della cartella" value="' +
+      '<input class="input" id="lkLabel" maxlength="40" placeholder="Come lo vuoi chiamare" value="' +
       (existing ? U.esc(existing.label) : '') + '"></div>' +
       '<div class="field"><label>Colore</label><div class="swatches" id="lkColor">' +
       LINK_COLORS.map(function (c) {
@@ -1453,7 +1512,7 @@
           var labelInput = U.$('#lkLabel', box);
 
           function setKind(v) {
-            kind = v === 'file' ? 'file' : 'dir';
+            kind = Views.kindInfo(v).key;
             U.$$('#lkKind button', box).forEach(function (b) {
               b.classList.toggle('active', b.dataset.v === kind);
             });
@@ -1515,7 +1574,17 @@
 
           function save() {
             var path = pathInput.value.trim();
-            if (!path) { App.toast('Serve un percorso', 'alert'); pathInput.focus(); return; }
+            if (!path) { App.toast('Serve un percorso o un indirizzo', 'alert'); pathInput.focus(); return; }
+
+            if (kind === 'url' && !Store.isUrl(path)) {
+              // Senza schema window.open lo prenderebbe per un percorso
+              // relativo alla pagina e finirebbe su https://flow.example/.
+              path = 'https://' + path.replace(/^[/]+/, '');
+            }
+            // E il contrario: un indirizzo web incollato con il tipo su
+            // "Cartella" non e' una cartella, qualunque cosa dica il selettore.
+            if (kind !== 'url' && Store.isUrl(path)) kind = 'url';
+
             var label = labelInput.value.trim() || Store.pathLeaf(path);
             Store.commit(existing ? 'collegamento' : 'nuovo collegamento', function () {
               if (existing) {

@@ -285,6 +285,116 @@ namespace FlowApp
     }
 
     /* ---------------------------------------------------------------- *
+     * Selettore di cartelle in stile Esplora risorse
+     *
+     * FolderBrowserDialog e' la vecchia finestrella ad albero, e su .NET
+     * Framework non ha modo di diventare quella moderna: OpenFileDialog si
+     * aggiorna da se' (AutoUpgradeEnabled), lei no. La finestra moderna e'
+     * IFileDialog con FOS_PICKFOLDERS, la stessa che apre l'Esplora risorse.
+     * Qui sotto ci sono le sole due interfacce COM che servono per aprirla.
+     *
+     * ATTENZIONE: l'ordine delle dichiarazioni e' l'ordine della vtable. I
+     * metodi che non chiamiamo restano come segnaposto e non vanno toccati,
+     * o gli slot successivi slittano e si chiama la funzione sbagliata.
+     * ---------------------------------------------------------------- */
+
+    internal enum Picked { Scelta, Annullata, NonDisponibile }
+
+    internal static class FolderPicker
+    {
+        private const uint PickFolders = 0x20;      // FOS_PICKFOLDERS
+        private const uint ForceFilesystem = 0x40;  // FOS_FORCEFILESYSTEM
+        private const uint PathMustExist = 0x800;   // FOS_PATHMUSTEXIST
+        private const int SigdnFileSysPath = unchecked((int)0x80058000);
+        private const int Cancelled = unchecked((int)0x800704C7);
+
+        [ComImport, ClassInterface(ClassInterfaceType.None),
+         Guid("DC1C5A9C-E88A-4dde-A5A1-60F82A20AEF7")]
+        private class FileOpenDialog { }
+
+        [ComImport, Guid("42f85136-db7e-439c-85f1-e4075d135fc8"),
+         InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+        private interface IFileDialog
+        {
+            // IModalWindow
+            [PreserveSig] int Show(IntPtr parent);
+            // IFileDialog
+            void SetFileTypes(uint count, IntPtr filters);
+            void SetFileTypeIndex(uint index);
+            void GetFileTypeIndex(out uint index);
+            void Advise(IntPtr events, out uint cookie);
+            void Unadvise(uint cookie);
+            void SetOptions(uint options);
+            void GetOptions(out uint options);
+            void SetDefaultFolder(IShellItem item);
+            void SetFolder(IShellItem item);
+            void GetFolder(out IShellItem item);
+            void GetCurrentSelection(out IShellItem item);
+            void SetFileName([MarshalAs(UnmanagedType.LPWStr)] string name);
+            void GetFileName([MarshalAs(UnmanagedType.LPWStr)] out string name);
+            void SetTitle([MarshalAs(UnmanagedType.LPWStr)] string title);
+            void SetOkButtonLabel([MarshalAs(UnmanagedType.LPWStr)] string text);
+            void SetFileNameLabel([MarshalAs(UnmanagedType.LPWStr)] string label);
+            void GetResult(out IShellItem item);
+            // I metodi successivi (AddPlace, SetDefaultExtension, Close, …) non servono.
+        }
+
+        [ComImport, Guid("43826d1e-e718-42ee-bc55-a1e261c37bfe"),
+         InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+        private interface IShellItem
+        {
+            void BindToHandler(IntPtr bc, ref Guid bhid, ref Guid riid, out IntPtr ppv);
+            void GetParent(out IShellItem parent);
+            void GetDisplayName(int sigdn, [MarshalAs(UnmanagedType.LPWStr)] out string name);
+            void GetAttributes(uint mask, out uint attributes);
+            void Compare(IShellItem other, uint hint, out int order);
+        }
+
+        /// <summary>
+        /// Apre la finestra moderna. <see cref="Picked.NonDisponibile"/> significa
+        /// che il COM non ha risposto (sistema molto ridotto): chi chiama ripiega
+        /// sulla finestra classica invece di lasciare l'utente senza selettore.
+        /// </summary>
+        public static Picked Show(IWin32Window owner, string title, out string path)
+        {
+            path = null;
+            object com = null;
+            try
+            {
+                com = new FileOpenDialog();
+                IFileDialog dialog = (IFileDialog)com;
+
+                uint options;
+                dialog.GetOptions(out options);
+                // FORCEFILESYSTEM tiene fuori le cartelle virtuali (Raccolte, Rete):
+                // di quelle non esiste un percorso da salvare in board.json.
+                dialog.SetOptions(options | PickFolders | ForceFilesystem | PathMustExist);
+                if (!string.IsNullOrEmpty(title)) dialog.SetTitle(title);
+
+                int hr = dialog.Show(owner == null ? IntPtr.Zero : owner.Handle);
+                if (hr == Cancelled) return Picked.Annullata;
+                if (hr != 0) return Picked.NonDisponibile;
+
+                IShellItem item;
+                dialog.GetResult(out item);
+                try { item.GetDisplayName(SigdnFileSysPath, out path); }
+                finally { Marshal.ReleaseComObject(item); }
+
+                return string.IsNullOrEmpty(path) ? Picked.Annullata : Picked.Scelta;
+            }
+            catch (Exception err)
+            {
+                Paths.Log("selettore moderno non disponibile: " + err.Message);
+                return Picked.NonDisponibile;
+            }
+            finally
+            {
+                if (com != null) Marshal.ReleaseComObject(com);
+            }
+        }
+    }
+
+    /* ---------------------------------------------------------------- *
      * La finestra
      * ---------------------------------------------------------------- */
 
@@ -572,6 +682,12 @@ namespace FlowApp
                 }
             }
 
+            string folder;
+            Picked outcome = FolderPicker.Show(this, "Scegli una cartella da collegare", out folder);
+            if (outcome == Picked.Scelta) return "{\"path\":" + Json.Str(folder) + "}";
+            if (outcome == Picked.Annullata) return "{\"cancelled\":true}";
+
+            // Ripiego sulla finestra classica: brutta, ma meglio di nessun selettore.
             using (FolderBrowserDialog dialog = new FolderBrowserDialog())
             {
                 dialog.Description = "Scegli una cartella da collegare";

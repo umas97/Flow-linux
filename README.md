@@ -99,7 +99,7 @@ Da **Impostazioni → Apri cartella** arrivi al file in due clic.
   trascinamento.
 - **Calendario** — mese intero; trascina un'attività su un altro giorno per
   spostarne la scadenza.
-- **Note** — appunti del progetto e collegamenti a cartelle o file sul disco.
+- **Note** — appunti del progetto e collegamenti a cartelle, file o siti web.
 - **Prossimi 7 giorni**, **Tutte le attività**, **Completate**.
 
 **Ordinamento delle sezioni**
@@ -133,19 +133,30 @@ assegnatario, sotto-attività con barra di avanzamento, duplicazione.
 La quarta scheda di un progetto (tasto `4`) tiene due cose:
 
 - gli **appunti** del progetto, in markdown leggero come le note di un'attività;
-- i **collegamenti**: pulsanti colorati che puntano a una cartella o a un file sul
-  disco. Un click apre l'**Esplora risorse** — su una cartella ne mostra il
-  contenuto, su un file apre la cartella che lo contiene con il file già
-  selezionato. **Il file non viene mai eseguito.**
+- i **collegamenti**: pulsanti colorati di tre tipi.
 
-Il percorso si mette con il selettore di Windows (*Scegli cartella…* /
-*Scegli file…*), incollandolo, o scrivendolo a mano. L'etichetta è preimpostata col
-nome dell'ultima cartella e si può cambiare, come il colore. Il pulsante `…` su un
-collegamento apre *Modifica*, *Copia percorso* e *Rimuovi*.
+| Tipo | Un click | Come si inserisce |
+|------|----------|-------------------|
+| **Cartella** | apre l'Esplora risorse mostrandone il contenuto | *Scegli cartella…*, incolla, o a mano |
+| **File** | apre la cartella che lo contiene, **col file già selezionato** | *Scegli file…*, incolla, o a mano |
+| **Collegamento web** | apre l'indirizzo nel **browser predefinito** | solo incolla o a mano |
 
-I collegamenti servono l'Esplora risorse, quindi funzionano solo avviando
+**Un file non viene mai eseguito**: viene soltanto evidenziato nella sua cartella.
+
+Il tipo si indovina da quello che incolli — `https://…` è un indirizzo web, un
+percorso che finisce con un'estensione è un file — e resta correggibile col
+selettore a tre stati nella finestra. L'etichetta è preimpostata col nome
+dell'ultima cartella, o col nome del sito per un indirizzo web, e si può cambiare
+come il colore. Il pulsante `…` su un collegamento apre *Modifica*,
+*Copia percorso* e *Rimuovi*.
+
+Con più di un collegamento compare il selettore d'ordine accanto al contatore:
+*Ordine di inserimento* (predefinito), *Tipo* (cartelle, poi file, poi web) o
+*Nome A→Z*. La scelta è salvata nell'archivio.
+
+Cartelle e file servono l'Esplora risorse, quindi funzionano solo avviando
 `Flow.exe`: aprendo `app\index.html` nel browser si vedono, ma il click avvisa che
-serve l'applicazione.
+serve l'applicazione. **Gli indirizzi web funzionano in tutti e due i modi.**
 
 **Ordine dei progetti**
 
@@ -168,8 +179,9 @@ mentre digiti un nome che non esiste ancora.
 
 **Interfaccia**
 
-Tema chiaro, scuro o automatico (segue Windows), colore principale
-personalizzabile, densità comoda o compatta, barra laterale comprimibile.
+Tema chiaro, scuro o automatico (segue Windows), colore principale scelto fra 24
+tinte, densità comoda o compatta, barra laterale comprimibile. Progetti ed etichette
+prendono i colori dalla stessa tavolozza, e un progetto può avere una fra 48 icone.
 Annulla e ripristina illimitati sulla sessione (`Ctrl+Z` / `Ctrl+Shift+Z`).
 
 Il **pannello dei dettagli** si affianca al contenuto invece di coprirlo: il suo
