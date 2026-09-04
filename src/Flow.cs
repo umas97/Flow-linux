@@ -598,6 +598,13 @@ namespace FlowApp
                             return;
                         }
 
+                    case "/api/kind":
+                        {
+                            if (method != "POST") { Reply(e, 405, "{\"error\":\"metodo non ammesso\"}"); return; }
+                            KindFromRequest(e, ReadBody(e));
+                            return;
+                        }
+
                     case "/api/quit":
                         Reply(e, 200, "{\"ok\":true}");
                         BeginInvoke((MethodInvoker)delegate { Close(); });
@@ -644,9 +651,11 @@ namespace FlowApp
         }
 
         /* ------------------------- collegamenti a cartelle e file -------------------------
-           Due endpoint per la scheda Note dei progetti. Il corpo della richiesta e'
-           il percorso (o "dir"/"file") in chiaro, non un oggetto JSON: qui non c'e'
-           un interprete JSON, e scriverne uno per una stringa sola non ha senso. */
+           Tre endpoint per la scheda Note dei progetti: /api/pick (selettore),
+           /api/kind (cartella o file?) e /api/open (mostra nell'Esplora risorse).
+           Il corpo della richiesta e' il percorso (o "dir"/"file") in chiaro, non un
+           oggetto JSON: qui non c'e' un interprete JSON, e scriverne uno per una
+           stringa sola non ha senso. */
 
         /// <summary>
         /// Apre il selettore nativo di Windows. La risposta arriva a scelta
@@ -695,6 +704,68 @@ namespace FlowApp
                 if (dialog.ShowDialog(this) != DialogResult.OK) return "{\"cancelled\":true}";
                 return "{\"path\":" + Json.Str(dialog.SelectedPath) + "}";
             }
+        }
+
+        /// <summary>
+        /// Guarda il disco e dice se il percorso e' una cartella o un file.
+        /// Serve alla finestra dei collegamenti per mettere il tipo da se':
+        /// l'estensione da sola sbaglia sia in un verso (una cartella chiamata
+        /// "versione 1.2") sia nell'altro (un file senza estensione).
+        /// Guarda e risponde: non apre e non scrive niente.
+        /// </summary>
+        private void KindFromRequest(CoreWebView2WebResourceRequestedEventArgs e, string raw)
+        {
+            // Interrogare il disco puo' volerci tempo — una cartella di rete
+            // che non risponde ci mette secondi — e qui si e' sul filo della
+            // finestra: la risposta si mette in attesa e la verifica va altrove.
+            CoreWebView2Deferral deferral = e.GetDeferral();
+            // Nome per esteso: un "using System.Threading" renderebbe ambiguo
+            // Timer, che qui e' quello di WinForms.
+            System.Threading.ThreadPool.QueueUserWorkItem(delegate
+            {
+                string json = KindOf(raw);
+                try
+                {
+                    BeginInvoke((MethodInvoker)delegate
+                    {
+                        try { Reply(e, 200, json); }
+                        catch (Exception err) { Paths.Log("risposta sul tipo non riuscita: " + err.Message); }
+                        finally { deferral.Complete(); }
+                    });
+                }
+                catch (Exception)
+                {
+                    // Finestra gia' chiusa: non c'e' piu' nessuno che aspetta.
+                    try { deferral.Complete(); }
+                    catch (Exception) { }
+                }
+            });
+        }
+
+        private static string KindOf(string raw)
+        {
+            // Le virgolette arrivano da "Copia come percorso" dell'Esplora
+            // risorse, che incolla il percorso fra apici.
+            string wanted = (raw ?? "").Trim().Trim('"');
+            if (wanted.Length == 0) return "{\"exists\":false}";
+
+            string full;
+            try
+            {
+                if (!Path.IsPathRooted(wanted)) return "{\"exists\":false}";
+                full = Path.GetFullPath(wanted);
+            }
+            catch (Exception) { return "{\"exists\":false}"; }
+
+            try
+            {
+                if (Directory.Exists(full)) return "{\"exists\":true,\"kind\":\"dir\"}";
+                if (File.Exists(full)) return "{\"exists\":true,\"kind\":\"file\"}";
+            }
+            catch (Exception) { }
+            // Non esiste, o non si ha il permesso di guardare: decide chi ha
+            // chiesto, in base all'estensione.
+            return "{\"exists\":false}";
         }
 
         /// <summary>

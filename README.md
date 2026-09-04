@@ -143,12 +143,17 @@ La quarta scheda di un progetto (tasto `4`) tiene due cose:
 
 **Un file non viene mai eseguito**: viene soltanto evidenziato nella sua cartella.
 
-Il tipo si indovina da quello che incolli — `https://…` è un indirizzo web, un
-percorso che finisce con un'estensione è un file — e resta correggibile col
-selettore a tre stati nella finestra. L'etichetta è preimpostata col nome
-dell'ultima cartella, o col nome del sito per un indirizzo web, e si può cambiare
-come il colore. Il pulsante `…` su un collegamento apre *Modifica*,
-*Copia percorso* e *Rimuovi*.
+Il tipo si mette da sé, mentre scrivi o incolli: `https://…` è un indirizzo web,
+e per un percorso su disco è Flow a guardare se esiste ed è una cartella o un
+file — l'estensione è solo il primo indizio, quindi una cartella chiamata
+`versione 1.2` e un file senza estensione finiscono comunque nel tipo giusto.
+Sotto il selettore a tre stati c'è scritto come l'ha capito; toccando il
+selettore la scelta diventa tua e il tipo non si muove più. Le virgolette di
+*Copia come percorso* dell'Esplora risorse le toglie da sé.
+
+L'etichetta è preimpostata col nome dell'ultima cartella, o col nome del sito per
+un indirizzo web, e si può cambiare come il colore. Il pulsante `…` su un
+collegamento apre *Modifica*, *Copia percorso* e *Rimuovi*.
 
 Con più di un collegamento compare il selettore d'ordine accanto al contatore:
 *Ordine di inserimento* (predefinito), *Tipo* (cartelle, poi file, poi web) o

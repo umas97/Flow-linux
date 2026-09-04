@@ -132,6 +132,20 @@
   Store.isUrl = function (v) { return URL_RE.test(String(v || '').trim()); };
 
   /**
+   * Ripulisce un percorso incollato. "Copia come percorso" dell'Esplora
+   * risorse mette il percorso fra virgolette, e con quelle attaccate non e'
+   * piu' un percorso assoluto: /api/open lo rifiuterebbe e il tipo non si
+   * riconoscerebbe.
+   */
+  Store.cleanPath = function (v) {
+    var s = String(v == null ? '' : v).trim();
+    if (s.length > 1 && s.charAt(0) === '"' && s.charAt(s.length - 1) === '"') {
+      s = s.slice(1, -1).trim();
+    }
+    return s;
+  };
+
+  /**
    * Etichetta predefinita di un collegamento. Regola unica: la usano il
    * selettore, l'incolla e normalize.
    * - indirizzo web: il nome del sito, che dice piu' dell'ultimo pezzo del
@@ -217,18 +231,21 @@
       if (LINK_SORTS.indexOf(p.linksSort) < 0) p.linksSort = 'manual';
       p.links = (Array.isArray(p.links) ? p.links : [])
         // Un collegamento senza percorso non porta in nessun posto: si scarta.
-        .filter(function (l) { return l && typeof l.path === 'string' && l.path.length; })
+        .filter(function (l) {
+          return l && typeof l.path === 'string' && Store.cleanPath(l.path).length;
+        })
         .map(function (l) {
+          var path = Store.cleanPath(l.path);
           // Il tipo dichiarato vince, ma un indirizzo web resta un indirizzo
           // web anche se l'archivio dice altro: altrimenti /api/open ci
           // proverebbe come se fosse un percorso su disco.
           var kind = LINK_KINDS.indexOf(l.kind) < 0 ? 'dir' : l.kind;
-          if (URL_RE.test(l.path)) kind = 'url';
+          if (URL_RE.test(path)) kind = 'url';
           else if (kind === 'url') kind = 'dir';
           return {
             id: l.id || U.uid('l'),
-            path: l.path,
-            label: l.label || Store.pathLeaf(l.path),
+            path: path,
+            label: l.label || Store.pathLeaf(path),
             color: l.color || p.color,
             kind: kind
           };

@@ -44,17 +44,23 @@ would never arrive. Adding a frontend `fetch` to a new endpoint therefore requir
 `case` in that switch.
 
 Endpoints: `GET/PUT /api/data`, `GET /api/info` (paths, backup count/bytes, WebView2
-version), `POST /api/reveal` (explorer), `POST /api/pick`, `POST /api/open`,
-`/api/quit`, `/api/health`.
+version), `POST /api/reveal` (explorer), `POST /api/pick`, `POST /api/kind`,
+`POST /api/open`, `/api/quit`, `/api/health`.
 
-`/api/pick` and `/api/open` take a **plain-text body, not JSON** (`dir`/`file` and a
-path respectively): there is no JSON parser in `Flow.cs` and one string doesn't
-justify writing one. `/api/pick` opens the native `FolderBrowserDialog` /
+`/api/pick`, `/api/kind` and `/api/open` take a **plain-text body, not JSON**
+(`dir`/`file` and a path respectively): there is no JSON parser in `Flow.cs` and one
+string doesn't justify writing one. `/api/pick` opens the native `FolderBrowserDialog` /
 `OpenFileDialog`, so it answers only once the user has chosen — it holds the request
 with `e.GetDeferral()` and shows the dialog from a `BeginInvoke` (a modal dialog can't
 be opened inside the event handler). `/api/open` only ever *reveals* a path in
 Explorer (`explorer.exe "<dir>"` or `/select,"<file>"`), refuses anything that isn't a
-rooted, existing path, and **never** `Process.Start`s the file itself.
+rooted, existing path, and **never** `Process.Start`s the file itself — and it decides
+dir-vs-file by looking at the filesystem, never from the link's stored `kind`.
+`/api/kind` answers `{"exists":true,"kind":"dir"|"file"}` for a rooted path that is
+really there and `{"exists":false}` otherwise; it is what makes the link dialog pick
+the type by itself. Like `/api/pick` it holds the request with a deferral and does the
+`Directory.Exists`/`File.Exists` on a thread-pool thread — a dead network share blocks
+for seconds, and this runs on the UI thread.
 
 ### Frontend: globals, no modules
 
@@ -143,14 +149,20 @@ work; it is mirrored into `localStorage['flow.route']` for the next launch.
   *and* in `Store.savePrefs()`.
 - **Project tabs.** `project.view` is one of `board` / `list` / `calendar` / `notes`,
   validated in `normalize()` — an unknown value falls back to `board` rather than
-  leaving `V.content` with nothing to render. The Notes tab holds `project.notes`
-  (markdown), `project.links` (`{ id, path, label, color, kind }`, `kind` being
-  `dir` / `file` / `url`) and `project.linksSort` (`manual` / `kind` / `alpha`).
-  `normalize()` keeps `kind` and `path` consistent in both directions: an
-  `http(s)://` path is always `url`, and a `url` kind on a disk path is demoted —
-  otherwise `/api/open` would try a web address as a filesystem path. A `url` link
-  never touches the host: `window.open` is caught by `NewWindowRequested`, which
-  hands it to the default browser, so web links also work with no host at all.
+  leaving `V.content` with nothing to render.
+- **Project notes and links.** The Notes tab holds `project.notes` (markdown),
+  `project.links` (`{ id, path, label, color, kind }`, `kind` being `dir` / `file` /
+  `url`) and `project.linksSort` (`manual` / `kind` / `alpha`). `normalize()` keeps
+  `kind` and `path` consistent in both directions: an `http(s)://` path is always
+  `url`, and a `url` kind on a disk path is demoted — otherwise `/api/open` would try
+  a web address as a filesystem path. Paths pass through `Store.cleanPath` (trim +
+  strip the quotes Explorer's "Copia come percorso" adds, which would make the path
+  non-rooted). In the dialog the type follows the path — `guessKind` from the text
+  right away, then `askKind`/`/api/kind` from the disk, and `save()` waits for that
+  answer — until the user touches the segmented control, which sets `ownKind` and
+  freezes it. A `url` link never touches the host: `window.open` is caught by
+  `NewWindowRequested`, which hands it to the default browser, so web links also work
+  with no host at all.
 - **One palette.** `COLORS` (24) and `EMOJIS` (48) at the top of
   [app.js](app/js/app.js) are the single source for projects, tags, links and the
   accent colour. There used to be four copied twelve-colour arrays that drifted

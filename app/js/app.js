@@ -1398,13 +1398,33 @@
     return true;
   }
 
-  /* Un indirizzo web si riconosce dallo schema; un percorso incollato non dice
-     se e' una cartella o un file, e l'estensione e' l'unico indizio. Il tipo
-     resta correggibile a mano nella finestra. */
+  /* Tipo indovinato dal solo testo: un indirizzo web si riconosce dallo schema,
+     per un percorso l'unico indizio e' l'estensione. E' la risposta immediata;
+     se l'host c'e', askKind la corregge guardando il disco. */
   function guessKind(path) {
-    var v = String(path).trim();
+    var v = Store.cleanPath(path);
     if (Store.isUrl(v)) return 'url';
     return /[.][A-Za-z0-9]{1,8}$/.test(v.replace(/[\\/]+$/, '')) ? 'file' : 'dir';
+  }
+
+  /* Tipo certo: lo dice l'host guardando il disco, perche' l'estensione sbaglia
+     sia su una cartella chiamata "versione 1.2" sia su un file senza estensione.
+     done riceve 'dir' o 'file' se il percorso esiste davvero, altrimenti null —
+     indirizzo web, percorso inesistente, nessun host — e allora vale guessKind.
+     Risponde sempre, cosi' chi salva puo' aspettare la risposta. */
+  function askKind(path, done) {
+    var v = Store.cleanPath(path);
+    if (!v || Store.isUrl(v) || Store.backend !== 'server') { done(null); return; }
+    fetch('/api/kind', { method: 'POST', body: v })
+      .then(function (r) { return r.json(); })
+      .then(function (res) { done(res && res.exists && res.kind ? res.kind : null); })
+      .catch(function () { done(null); });
+  }
+
+  /* Cosa dire di come si e' capito il tipo, prima che risponda l'host. */
+  function hintFor(path) {
+    if (Store.isUrl(path)) return 'È un indirizzo web: si vede dallo schema.';
+    return 'Dedotto dal percorso: correggilo se sbaglia.';
   }
 
   function openLink(l) {
@@ -1473,10 +1493,13 @@
   function linkModal(p, existing) {
     var color = (existing && existing.color) || p.color;
     var kind = (existing && existing.kind) || 'dir';
-    // Su un collegamento nuovo etichetta e tipo seguono il percorso finche' non
-    // li si mette a mano; su uno esistente sono sempre roba dell'utente.
+    // L'etichetta segue il percorso finche' non la si scrive a mano; su un
+    // collegamento che esiste gia' e' roba dell'utente e non si tocca.
     var ownLabel = !!existing;
-    var ownKind = !!existing;
+    // Il tipo invece segue sempre il percorso — anche riaprendo un
+    // collegamento, se il percorso viene cambiato — e si ferma solo quando lo
+    // si sceglie a mano qui sotto.
+    var ownKind = false;
 
     Modal.open(
       '<div class="modal-head"><h2>' + (existing ? 'Modifica collegamento' : 'Nuovo collegamento') + '</h2></div>' +
@@ -1493,7 +1516,8 @@
       '<div class="field"><label>Tipo</label><div class="seg" id="lkKind">' +
       Views.LINK_KINDS.map(function (k) {
         return '<button data-v="' + k.key + '">' + icon(k.ic, 'sm') + U.esc(k.label) + '</button>';
-      }).join('') + '</div></div>' +
+      }).join('') +
+      '</div><div class="hint" id="lkKindHint"></div></div>' +
       '<div class="field"><label>Etichetta</label>' +
       '<input class="input" id="lkLabel" maxlength="40" placeholder="Come lo vuoi chiamare" value="' +
       (existing ? U.esc(existing.label) : '') + '"></div>' +
@@ -1511,20 +1535,36 @@
           var pathInput = U.$('#lkPath', box);
           var labelInput = U.$('#lkLabel', box);
 
-          function setKind(v) {
+          var kindHint = U.$('#lkKindHint', box);
+
+          function setKind(v, why) {
             kind = Views.kindInfo(v).key;
             U.$$('#lkKind button', box).forEach(function (b) {
               b.classList.toggle('active', b.dataset.v === kind);
             });
+            kindHint.textContent = why || '';
           }
-          setKind(kind);
+          setKind(kind, 'Si imposta da sé in base al percorso.');
 
           U.$('#lkKind', box).onclick = function (ev) {
             var b = ev.target.closest('[data-v]');
             if (!b) return;
             ownKind = true;
-            setKind(b.dataset.v);
+            setKind(b.dataset.v, 'Scelto a mano.');
           };
+
+          /* Riconoscimento del tipo: prima l'estensione, subito, poi la
+             risposta dell'host, che guarda il disco e sa la verita'. La
+             richiesta parte a mano ferma, e quando torna si controlla che il
+             percorso sia ancora quello: la risposta di uno precedente non deve
+             sovrascrivere un tipo piu' recente. */
+          var autoKind = U.debounce(function (asked) {
+            askKind(asked, function (found) {
+              if (!found || ownKind || Store.cleanPath(pathInput.value) !== asked) return;
+              setKind(found, found === 'dir' ? 'È una cartella: trovata su disco.' : 'È un file: trovato su disco.');
+            });
+          }, 300);
+
           U.$('#lkColor', box).onclick = function (ev) {
             var b = ev.target.closest('[data-c]');
             if (!b) return;
@@ -1534,9 +1574,11 @@
 
           labelInput.addEventListener('input', function () { ownLabel = true; });
           pathInput.addEventListener('input', function () {
-            var v = pathInput.value.trim();
+            var v = Store.cleanPath(pathInput.value);
             if (!ownLabel) labelInput.value = v ? Store.pathLeaf(v) : '';
-            if (!ownKind) setKind(guessKind(v));
+            if (ownKind) return;
+            setKind(guessKind(v), v ? hintFor(v) : '');
+            autoKind(v);
           });
 
           function pick(what) {
@@ -1546,9 +1588,10 @@
               .then(function (res) {
                 if (!res || !res.path) return;   // finestra annullata
                 pathInput.value = res.path;
-                // Il selettore sa con certezza cosa e' stato scelto.
-                ownKind = true;
-                setKind(what);
+                // Il selettore sa con certezza cosa e' stato scelto — ma non
+                // conta come scelta a mano: se poi il percorso viene riscritto,
+                // il tipo torna a seguirlo.
+                setKind(what, what === 'dir' ? 'Cartella, scelta col selettore.' : 'File, scelto col selettore.');
                 if (!ownLabel) labelInput.value = Store.pathLeaf(res.path);
                 pathInput.focus();
               })
@@ -1572,10 +1615,24 @@
             if (ev.key === 'Enter') { ev.preventDefault(); save(); }
           });
 
+          /* Si salva anche con Invio, che puo' arrivare prima che la verifica
+             del tipo sia tornata: qui la si aspetta, cosi' nell'archivio non
+             finisce un tipo dedotto quando l'host sapeva quello giusto. */
+          var saving = false;
           function save() {
-            var path = pathInput.value.trim();
+            var path = Store.cleanPath(pathInput.value);
             if (!path) { App.toast('Serve un percorso o un indirizzo', 'alert'); pathInput.focus(); return; }
+            if (saving) return;
+            if (ownKind) { write(path); return; }
+            saving = true;
+            askKind(path, function (found) {
+              saving = false;
+              if (found) kind = found;
+              write(path);
+            });
+          }
 
+          function write(path) {
             if (kind === 'url' && !Store.isUrl(path)) {
               // Senza schema window.open lo prenderebbe per un percorso
               // relativo alla pagina e finirebbe su https://flow.example/.
