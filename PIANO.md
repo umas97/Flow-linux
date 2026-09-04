@@ -21,7 +21,7 @@ Legenda stato: `da fare` · `in corso` · `fatto` · `rimandato`
 | 7 | 6 | Ordinamenti per sezione | fatto | `views.js`, `app.js`, `store.js`, `icons.js`, `styles.css`, `README.md` |
 | 8 | 5 | Riordino dei progetti + lucchetto | fatto | `views.js`, `app.js`, `store.js`, `index.html`, `styles.css`, `README.md` |
 | 9 | 1 | Sezione Note per progetto con collegamenti a cartelle | fatto | `src/Flow.cs`, `views.js`, `app.js`, `store.js`, `styles.css`, `README.md`, `CLAUDE.md` |
-| 10 | 9 | Ripulitura dei dati personali + git | da fare | `data/`, `dist/`, `.gitignore`, `README.md` |
+| 10 | 9 | Ripulitura dei dati personali + git | fatto | `data/`, `dist/`, `CLAUDE.md`, `README.md`, `PIANO.md` |
 
 ### Perché quest'ordine
 - **1 e 2** sono la stessa zona di CSS (la catena delle altezze della griglia) e vanno
@@ -798,7 +798,7 @@ l'avviso, non una finestra).
 ## Fase 10 · Ripulitura dei dati personali + git
 <sub>richiesta 9</sub>
 
-**Stato:** da fare
+**Stato:** fatto
 
 ### Decisioni prese
 - **`data/`: svuota e ignora.** Copia dell'archivio attuale salvata **fuori dal progetto**,
@@ -810,17 +810,21 @@ l'avviso, non una finestra).
 - **git**: `git init` + `.gitignore` + primo commit. La pubblicazione su GitHub la fai tu.
 
 ### Cosa contiene dati personali (verificato)
+Questa tabella era scritta coi nomi veri: siccome il documento sta **dentro** il
+repository, i nomi sono stati sostituiti dalla descrizione (vedi *Fatto*, ultimo punto).
+
 | File | Contenuto |
 |------|-----------|
-| `data/board.json` | progetto reale “FAC FIRMWARE” con le sue attività |
+| `data/board.json` | un progetto di lavoro reale con le sue attività |
 | `data/backups/*.json` (8 file) | copie dello stesso archivio |
-| `data/flow.log` | percorso `C:\Users\Filippo\Desktop\free-asana\data\board.json` |
-| `data/.window` | geometria della finestra (`-187,-926,1440,900,0`) |
+| `data/flow.log` | il percorso assoluto dell'archivio, nome utente compreso |
+| `data/.window` | geometria della finestra |
 | `data/.webview2/` | cache, cronologia e cookie del WebView2 (11 MB) |
-| `dist/*.zip` | pacchetti rilasciati, verosimilmente con dentro un `board.json` reale |
+| `dist/*.zip` | pacchetti rilasciati (verificati: **nessun** `board.json` dentro) |
 
-Nel codice (`src/`, `app/`, `*.md`, `build.cmd`) **non c'è nessun percorso, nome o indirizzo
-personale**: verificato con ricerca su `Filippo`, `smasaps`, `Desktop`.
+Nel codice (`src/`, `app/`, `build.cmd`) **non c'è nessun percorso, nome o indirizzo
+personale**: verificato con ricerca sul nome utente, sul dominio di posta e sul percorso
+della cartella. L'unico file dove ne restavano era questo.
 
 ### Piano
 1. Copia di sicurezza di `data/board.json` e `data/backups/` nella cartella di lavoro
@@ -846,7 +850,59 @@ personale**: verificato con ricerca su `Filippo`, `smasaps`, `Desktop`.
 ### Da tenere a mente
 `Flow.exe` è compilato: se nella fase 9 si modifica `src/Flow.cs`, va rilanciato
 `build.cmd` **prima** del commit, altrimenti su GitHub finisce un eseguibile che non
-corrisponde ai sorgenti.
+corrisponde ai sorgenti. *(Fatto: la fase 9 ha ricompilato e committato l'exe insieme
+al sorgente.)*
+
+### Fatto
+- **Copia di sicurezza**, fuori dal progetto, in
+  `Desktop\flow-archivio-2026-09-04\`: `board.json`, gli 8 file di `backups/`,
+  `flow.log`, `.window`, i due zip di `dist/` (**spostati**, non cancellati) e il
+  `Flow.lnk` che era rimasto in `vecchio-avvio-server/`. Per rimettere l'archivio al suo
+  posto basta ricopiare `board.json` in `data\`.
+- **Gli zip erano già pubblicabili**: verificati voce per voce, nessuno dei due contiene
+  un `board.json`. `Flow-1.0-completo.zip` era grosso (34 MB) per un `node.exe` da
+  92 MB non compresso — l'ultimo residuo del vecchio avvio.
+- **`data/` svuotata**: via `board.json`, `backups/`, `flow.log`, `.window` e
+  `.webview2/`. Resta solo `data/.gitkeep`.
+  **`board.json` non è stato riscritto a mano** con l'archivio di esempio: senza il file
+  l'host risponde `{}`, `Store.load` vede `fresh` e chiama `seed()`, che scrive subito
+  il progetto *Benvenuto in Flow*. Così l'esempio ha una sola definizione — quella in
+  [store.js](app/js/store.js) — invece di un doppione su disco destinato a divergere.
+- **`vecchio-avvio-server/` e `dist/` non ci sono più.** Il primo era tracciato, quindi
+  resta nella cronologia: `git show db0942b:vecchio-avvio-server/server.js`.
+- `.gitignore` **c'era già dal primo commit** (`data/*`, `!data/.gitkeep`, `dist/`,
+  `*.lnk`, `*.pdb`, `Thumbs.db`, `desktop.ini`), e con esso il repository e
+  `data/.gitkeep`. Il punto 7 del piano — `git init` e primo commit — era quindi già
+  fatto: **niente dell'archivio dell'utente è mai entrato in git.** Questo cambia il
+  senso della fase: non era una bonifica del repository ma della cartella di lavoro, e
+  di cosa si vede in un clone pulito.
+- `CLAUDE.md`: tolti i riferimenti a `vecchio-avvio-server/` e a `dist/`, riscritta la
+  nota su `data/` (creata dall'app, ignorata da git, in una copia di lavoro è l'archivio
+  vero di qualcuno) e aggiunto l'obbligo di committare `Flow.exe` ricompilato insieme a
+  `src/`.
+- `README.md`: la struttura della cartella dice ora che `data\` nasce al primo avvio, con
+  il progetto di esempio e il rimando a *Impostazioni → Azzera tutto*. Niente in README
+  promette file che non esistono più — il vecchio avvio non era mai stato documentato là,
+  se non per dire che *non* serve più né `.lnk` né `node.exe`.
+
+### Trovato durante la fase: i dati personali sono nella cronologia di git
+Questo documento è tracciato dal primo commit, e la tabella qui sopra conteneva il nome
+del progetto di lavoro e il percorso `C:\Users\<utente>\…`. Quei valori sono quindi in
+**tutti e sei** i commit, non solo nell'ultimo: ripulire il file adesso non li toglie
+dalla cronologia, e pubblicando il repository si pubblicherebbero.
+
+Il repository **non ha nessun remoto e non è mai stato spinto**, quindi riscrivere la
+cronologia non ha controindicazioni. Le vie sono due, e la scelta è di chi pubblica:
+
+1. **Accettarlo.** Sono un nome di progetto e un nome utente Windows: informazioni
+   modeste, e in migliaia di repository ce ne sono di uguali.
+2. **Riscrivere la cronologia** (i sei commit sono locali): un `git checkout --orphan` +
+   commit unico, oppure `git filter-repo` sul solo `PIANO.md`. Il primo appiattisce la
+   storia del lavoro, il secondo la conserva riscrivendo gli hash.
+
+Nel dubbio, la terza via è **non versionare `PIANO.md`**: è un documento di lavoro (lo
+dice la sua ultima riga) e la sua eliminazione da `HEAD` più il rewrite risolve entrambe
+le cose insieme.
 
 ---
 
@@ -862,4 +918,5 @@ corrisponde ai sorgenti.
   (preferenze d'interfaccia).
 - Dopo ogni fase: riavviare `Flow.exe`, provare la funzione, controllare `data/flow.log`
   e aggiornare lo stato nella tabella in cima.
-- Questo documento è di lavoro: se non lo vuoi su GitHub, si elimina alla fase 10.
+- Questo documento è di lavoro: se non lo vuoi su GitHub, si elimina — ma va tolto anche
+  dalla cronologia, vedi la fine della fase 10.

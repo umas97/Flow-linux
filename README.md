@@ -256,7 +256,7 @@ app\
     views.js        rendering delle viste
     detail.js       pannello attività, menu, modali
     app.js          routing, eventi, trascinamento, scorciatoie
-data\
+data\               creata al primo avvio, non c'è niente da preparare
   board.json        il tuo archivio
   backups\          copie automatiche
   flow.log          log dell'ultimo avvio
@@ -265,6 +265,9 @@ data\
 ```
 
 Nessun `package.json`, nessun `node_modules`, niente da installare per usarla.
+
+Al primo avvio `data\` è vuota: Flow ci scrive un `board.json` con un progetto di
+esempio, *Benvenuto in Flow*, che puoi svuotare da **Impostazioni → Azzera tutto**.
 
 ### Ricompilare
 

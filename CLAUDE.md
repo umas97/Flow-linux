@@ -146,13 +146,18 @@ work; it is mirrored into `localStorage['flow.route']` for the next launch.
 
 ## Repo notes
 
-- `data/` is the user's live archive plus the WebView2 cache — don't rewrite `board.json` or
-  clear `data/backups/` as part of a code change.
-- [vecchio-avvio-server/](vecchio-avvio-server/) is the superseded launch path (a Node
-  `http` server on 127.0.0.1, `.vbs` launcher, `.lnk`). Kept for reference only; the storage
-  logic in `Flow.cs` is a direct translation of its `server.js`. Do not update it alongside
-  changes to the current app.
-- `dist/` holds released zips. `Flow.exe` is checked in, so a change to `src/Flow.cs` isn't
-  usable until `build.cmd` has run.
+- **`data/` is the user's live archive** — `board.json`, `backups/`, `flow.log`, `.window`
+  and the WebView2 cache. Everything under it is gitignored except `.gitkeep`, and the
+  whole folder is recreated by the app: a fresh clone has an empty `data/`, and the first
+  launch writes `board.json` from `seed()` in [store.js](app/js/store.js). Never rewrite
+  `board.json` or clear `backups/` as part of a code change — on a working copy that is
+  somebody's real archive.
+- `Flow.exe` is checked in, so a change to `src/Flow.cs` isn't usable until `build.cmd`
+  has run — and a commit that touches `src/` must carry the rebuilt exe, or GitHub gets a
+  binary that doesn't match its source.
+- The superseded launch path (a Node `http` server on 127.0.0.1, `.vbs` launcher, `.lnk`)
+  and the released zips under `dist/` were removed in phase 10. The storage logic in
+  `Flow.cs` is a direct translation of that server's `server.js`; if you ever need to see
+  the original, it is in history — `git show db0942b:vecchio-avvio-server/server.js`.
 - [README.md](README.md) is end-user documentation in Italian and doubles as the spec for
   shortcuts, views and backup rules — update it when you change any of them.
