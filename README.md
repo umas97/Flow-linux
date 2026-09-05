@@ -306,3 +306,10 @@ CLAUDE.md           istruzioni per Claude Code
   per X11, KDE o altri gestori file: dove serve basta il ripiego generico su `Gio.AppInfo`.
 - [GUIDA.md](GUIDA.md) è documentazione per l'utente finale in italiano e fa da specifica
   per scorciatoie, viste e regole dei backup: va aggiornata quando se ne cambia una.
+
+---
+
+## Licenza
+
+[MIT](LICENSE) — licenza dell'originale [FloppyO1/Flow](https://github.com/FloppyO1/Flow),
+mantenuta invariata su questo fork.
