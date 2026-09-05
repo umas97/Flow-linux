@@ -8,21 +8,30 @@ finisce in un unico file JSON sul tuo disco.
 
 ## Avvio
 
-Doppio clic su **`Flow.exe`**. Non c'è altro da sapere.
+Apri la cartella in un terminale e lancia **`./flow`**. Non c'è altro da sapere.
 
-Puoi trascinarlo sulla barra delle applicazioni o nel menu Start per averlo
-sempre a portata di mano. Si apre una finestra dedicata, con la sua icona: non è
-un browser travestito e non c'è nessuna barra degli indirizzi.
+Per averlo nel menu delle applicazioni, una volta sola:
+
+```
+./install.sh
+```
+
+Da lì in poi Flow è fra le applicazioni di GNOME, con la sua icona, e si può
+aggiungere ai preferiti nella barra laterale. `./uninstall.sh` toglie la voce di
+menu; **la tua cartella `data/` non viene toccata**, né dall'una né dall'altro.
+
+Si apre una finestra dedicata, con la sua icona: non è un browser travestito e
+non c'è nessuna barra degli indirizzi.
 
 ### Niente server, niente porte
 
-Flow è una finestra WebView2 — il motore di pagina che Windows ha già dentro, lo
-stesso che fa funzionare Edge. L'interfaccia sta in `app\`, e l'eseguibile gliela
-serve **da dentro il proprio processo**: nessun socket aperto, nessuna porta in
-ascolto, niente che resti acceso dopo che hai chiuso la finestra.
+Flow è una finestra WebKitGTK — lo stesso motore di pagina che Ubuntu usa per il
+suo browser di sistema e per le anteprime. L'interfaccia sta in `app/`, e l'host
+gliela serve **da dentro il proprio processo**: nessun socket aperto, nessuna
+porta in ascolto, niente che resti acceso dopo che hai chiuso la finestra.
 
 Quando l'app salva non parla con un server: chiama direttamente il codice che
-scrive `data\board.json`.
+scrive `data/board.json`.
 
 ### Serve internet?
 
@@ -32,40 +41,42 @@ e stili sono tutti dentro la cartella: nessuna risorsa viene scaricata.
 
 ### Serve installare qualcosa?
 
-No. Flow si appoggia a due cose che Windows ha già di suo:
+Quattro pacchetti, tutti nei repository ufficiali di Ubuntu 24.04:
 
-- **.NET Framework 4.x**, incluso in Windows 8, 10 e 11;
-- **il runtime WebView2**, installato di serie su Windows 10 e 11 insieme a Edge.
+```
+sudo apt install python3-gi python3-gi-cairo gir1.2-gtk-3.0 gir1.2-webkit2-4.1
+```
 
-Su un Windows aggiornato ci sono entrambi. Se il runtime WebView2 mancasse, Flow
-te lo dice all'avvio con un messaggio, invece di fallire in silenzio.
+Su una Ubuntu con GNOME sono quasi sempre già installati, perché li usa il resto
+del sistema. Niente `pip`, niente ambienti virtuali, niente da compilare. Se
+manca qualcosa, Flow te lo dice all'avvio e ti stampa il comando esatto, invece
+di fallire in silenzio.
 
 ---
 
 ## Portabilità
 
-Sì: puoi zippare la cartella e usarla altrove. Flow si orienta da sé — parte
-sempre dalla posizione in cui si trova `Flow.exe` e cerca lì accanto `app\` e
-`data\`. Funziona da chiavetta USB, con qualsiasi lettera di unità, e anche se il
-percorso contiene spazi.
+Sì: puoi comprimere la cartella e usarla altrove. Flow si orienta da sé — parte
+sempre dalla posizione in cui si trova lo script `flow` e cerca lì accanto `app/`
+e `data/`. Funziona da chiavetta USB e anche se il percorso contiene spazi.
 
-L'unica regola: **`Flow.exe` e la cartella `app\` vanno tenuti insieme.** Se li
-separi, all'avvio te lo dice invece di aprire una finestra vuota.
+L'unica regola: **`flow`, `src/` e la cartella `app/` vanno tenuti insieme.** Se
+li separi, all'avvio te lo dice invece di aprire una finestra vuota.
 
-Non c'è più nessun collegamento `.lnk` con percorsi assoluti da riparare, e
-nessun `node.exe` da copiare: l'eseguibile *è* l'applicazione.
+Spostando la cartella dopo aver lanciato `./install.sh`, la voce di menu punta
+ancora al vecchio percorso: rilancia `./install.sh` dalla posizione nuova.
 
 | Scenario | Serve installare qualcosa? |
 |---|---|
-| Cartella zippata, qualsiasi PC con Windows 10 o 11 | no |
+| Cartella copiata su un'altra Ubuntu 24.04 con GNOME | quasi sempre no |
 | Cartella su chiavetta USB | no |
-| Windows 8.1 senza runtime WebView2 | solo il runtime WebView2 |
+| Distribuzione senza i binding PyGObject/WebKitGTK | i quattro pacchetti `apt` |
 
-I tuoi dati viaggiano con la cartella: sono in `data\board.json`, dentro il
-pacchetto. Se preferisci un archivio pulito, cancella `data\` prima di zippare
-(verrà ricreato al primo avvio) — ma **esporta prima**, se ti servono.
+I tuoi dati viaggiano con la cartella: sono in `data/board.json`, dentro il
+pacchetto. Se preferisci un archivio pulito, cancella `data/` prima di
+comprimere (verrà ricreato al primo avvio) — ma **esporta prima**, se ti servono.
 
-Una cosa da sapere prima di zippare: `data\.webview2` è la cache del motore di
+Una cosa da sapere prima di comprimere: `data/.webkit` è la cache del motore di
 pagina, può arrivare a qualche decina di MB ed è del tutto usa e getta. Puoi
 cancellarla quando vuoi, viene ricreata da sola al primo avvio.
 
@@ -74,8 +85,8 @@ cancellarla quando vuoi, viene ricreata da sola al primo avvio.
 ## Dove finiscono i dati
 
 ```
-data\board.json          l'archivio: progetti, attività, etichette, impostazioni
-data\backups\            copie automatiche, a rotazione: solo le ultime 25
+data/board.json          l'archivio: progetti, attività, etichette, impostazioni
+data/backups/            copie automatiche, a rotazione: solo le ultime 25
 ```
 
 Il salvataggio è automatico e avviene circa mezzo secondo dopo ogni modifica. La
@@ -83,8 +94,9 @@ scrittura è atomica (file temporaneo + rinomina), quindi un blocco improvviso d
 computer non può lasciarti un archivio troncato. Una copia di sicurezza viene
 messa da parte al massimo ogni 5 minuti.
 
-Puoi copiare `data\board.json` dove vuoi: è il tuo archivio, in chiaro e leggibile.
-Da **Impostazioni → Apri cartella** arrivi al file in due clic.
+Puoi copiare `data/board.json` dove vuoi: è il tuo archivio, in chiaro e leggibile.
+Da **Impostazioni → Apri cartella** arrivi al file in due clic: si apre il gestore
+file con `board.json` già selezionato.
 
 ---
 
@@ -158,7 +170,7 @@ I tipi sono tre:
 
 | Tipo | Un click | Come si inserisce |
 |------|----------|-------------------|
-| **Cartella** | apre l'Esplora risorse mostrandone il contenuto | *Scegli cartella…*, incolla, o a mano |
+| **Cartella** | apre il gestore file mostrandone il contenuto | *Scegli cartella…*, incolla, o a mano |
 | **File** | apre la cartella che lo contiene, **col file già selezionato** | *Scegli file…*, incolla, o a mano |
 | **Collegamento web** | apre l'indirizzo nel **browser predefinito** | solo incolla o a mano |
 
@@ -169,8 +181,14 @@ e per un percorso su disco è Flow a guardare se esiste ed è una cartella o un
 file — l'estensione è solo il primo indizio, quindi una cartella chiamata
 `versione 1.2` e un file senza estensione finiscono comunque nel tipo giusto.
 Sotto il selettore a tre stati c'è scritto come l'ha capito; toccando il
-selettore la scelta diventa tua e il tipo non si muove più. Le virgolette di
-*Copia come percorso* dell'Esplora risorse le toglie da sé.
+selettore la scelta diventa tua e il tipo non si muove più. Le virgolette che si
+porta dietro un percorso copiato da un terminale le toglie da sé.
+
+I percorsi sono quelli di Linux: iniziano con `/`, e `~` sta per la tua cartella
+personale. Un archivio arrivato da una macchina Windows si apre senza problemi,
+ma i suoi collegamenti con percorsi tipo `C:\Progetti` non porteranno da nessuna
+parte: restano scritti, e cliccandoli Flow dice che il percorso non esiste. Li
+puoi correggere a mano, uno per uno — nessun dato viene toccato al posto tuo.
 
 L'etichetta è preimpostata col nome dell'ultima cartella, o col nome del sito per
 un indirizzo web. Il colore di un collegamento nuovo è preso a caso dalla
@@ -183,8 +201,8 @@ Con più di un collegamento compare il selettore d'ordine accanto al contatore:
 *Nome A→Z*. La scelta è salvata nell'archivio, e ogni progetto e ogni attività
 ha la sua.
 
-Cartelle e file servono l'Esplora risorse, quindi funzionano solo avviando
-`Flow.exe`: aprendo `app\index.html` nel browser si vedono, ma il click avvisa che
+Cartelle e file passano dal gestore file, quindi funzionano solo avviando
+`./flow`: aprendo `app/index.html` nel browser si vedono, ma il click avvisa che
 serve l'applicazione. **Gli indirizzi web funzionano in tutti e due i modi.**
 
 **Ordine dei progetti**
@@ -208,7 +226,7 @@ mentre digiti un nome che non esiste ancora.
 
 **Interfaccia**
 
-Tema chiaro, scuro o automatico (segue Windows), colore principale scelto fra 24
+Tema chiaro, scuro o automatico (segue GNOME), colore principale scelto fra 24
 tinte, densità comoda o compatta, barra laterale comprimibile. Progetti ed etichette
 prendono i colori dalla stessa tavolozza, e un progetto può avere una fra 48 icone.
 Annulla e ripristina illimitati sulla sessione (`Ctrl+Z` / `Ctrl+Shift+Z`).
@@ -278,18 +296,16 @@ martedì, priorità alta, etichetta `urgente`, assegnata a te, nel progetto *Lav
 ## Struttura della cartella
 
 ```
-Flow.exe            l'applicazione (usa questo)
-Flow.exe.config     accompagna l'eseguibile, deve stargli accanto
-build.cmd           ricompila Flow.exe, serve solo se tocchi src\
-lib\                le tre librerie di WebView2
-src\
-  Flow.cs           l'host: finestra, file serviti, salvataggio su disco
-  Flow.manifest     permessi e nitidezza sugli schermi ad alta densità
-app\
+flow                l'avvio (usa questo)
+install.sh          mette Flow nel menu delle applicazioni
+uninstall.sh        lo toglie, senza toccare i tuoi dati
+src/
+  flow.py           l'host: finestra, file serviti, salvataggio su disco
+app/
   index.html        struttura della pagina
   styles.css        temi e componenti
-  flow.ico          icona
-  js\
+  flow.svg          icona
+  js/
     icons.js        icone SVG in linea
     util.js         date, DOM, markdown minimale
     store.js        stato, salvataggio, annulla/ripristina
@@ -297,30 +313,25 @@ app\
     views.js        rendering delle viste
     detail.js       pannello attività, menu, modali
     app.js          routing, eventi, trascinamento, scorciatoie
-data\               creata al primo avvio, non c'è niente da preparare
+data/               creata al primo avvio, non c'è niente da preparare
   board.json        il tuo archivio
-  backups\          copie automatiche
+  backups/          copie automatiche
   flow.log          log dell'ultimo avvio
-  .webview2\        cache del motore di pagina, cancellabile
-  .window           posizione e dimensione della finestra
+  .webkit/          cache del motore di pagina, cancellabile
+  .window           dimensione della finestra
 ```
 
-Nessun `package.json`, nessun `node_modules`, niente da installare per usarla.
+Nessun `package.json`, nessun `node_modules`, niente da compilare: `src/flow.py`
+è il programma, eseguito così com'è.
 
-Al primo avvio `data\` è vuota: Flow ci scrive un `board.json` con un progetto di
+Al primo avvio `data/` è vuota: Flow ci scrive un `board.json` con un progetto di
 esempio, *Benvenuto in Flow*, che puoi svuotare da **Impostazioni → Azzera tutto**.
-
-### Ricompilare
-
-Serve solo se metti mano a `src\Flow.cs`: doppio clic su **`build.cmd`**. Usa il
-compilatore C# che sta già dentro Windows (`csc.exe`, parte di .NET Framework):
-niente Visual Studio, niente SDK, niente pacchetti da scaricare.
 
 ---
 
 ## Copie di sicurezza
 
-**La cartella non cresce all'infinito.** I backup ruotano: `data\backups\`
+**La cartella non cresce all'infinito.** I backup ruotano: `data/backups/`
 conserva al massimo **25** file `board-*.json` e cancella i più vecchi man mano.
 Il tetto di spazio è quindi circa *25 × la dimensione di* `board.json` — con
 qualche centinaio di attività si parla di pochi MB. Numero e peso complessivo

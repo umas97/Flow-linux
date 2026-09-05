@@ -7,14 +7,19 @@
 
   /* ------------------------------------------------------------------ *
    * Backend di persistenza
-   *  - "server": servito da Flow.exe -> scrive su data/board.json
+   *  - "server": servito da ./flow -> scrive su data/board.json
    *  - "local" : aperto con doppio clic su index.html -> localStorage
    *
    * Il nome "server" è rimasto per comodità: dietro non c'è più un server,
    * ma l'host nativo che risponde alle stesse chiamate /api/ restando
    * dentro il processo dell'applicazione.
+   *
+   * L'host monta la pagina su uno schema URI proprio (flow://flow.example):
+   * senza contarlo qui l'app ripiegherebbe su localStorage pur avendo
+   * l'archivio su disco già disponibile.
    * ------------------------------------------------------------------ */
-  var isServed = location.protocol === 'http:' || location.protocol === 'https:';
+  var isServed = location.protocol === 'flow:' ||
+    location.protocol === 'http:' || location.protocol === 'https:';
   var BACKEND = isServed ? 'server' : 'local';
   var LS_KEY = 'flow.board';
   var LS_PREFS = 'flow.prefs';
@@ -109,7 +114,7 @@
         task({
           title: 'Tema chiaro, scuro o automatico', sectionId: s3, order: 1000,
           done: true, completedAt: n,
-          notes: 'Il selettore è in basso nella barra laterale. "Auto" segue le impostazioni di Windows.'
+          notes: 'Il selettore è in basso nella barra laterale. "Auto" segue il tema di GNOME.'
         }),
         task({ title: 'Fare la spesa', projectId: pid2, sectionId: 's_casa1', order: 1000, due: t, tags: ['tg_casa'], priority: 2 }),
         task({ title: 'Prenotare il tagliando dell\'auto', projectId: pid2, sectionId: 's_casa1', order: 2000, due: U.addDays(t, 3) }),
@@ -132,9 +137,9 @@
   Store.isUrl = function (v) { return URL_RE.test(String(v || '').trim()); };
 
   /**
-   * Ripulisce un percorso incollato. "Copia come percorso" dell'Esplora
-   * risorse mette il percorso fra virgolette, e con quelle attaccate non e'
-   * piu' un percorso assoluto: /api/open lo rifiuterebbe e il tipo non si
+   * Ripulisce un percorso incollato. Un percorso copiato da un terminale
+   * arriva spesso fra virgolette, e con quelle attaccate non e' piu' un
+   * percorso assoluto: /api/open lo rifiuterebbe e il tipo non si
    * riconoscerebbe.
    */
   Store.cleanPath = function (v) {
@@ -150,7 +155,7 @@
    * selettore, l'incolla e normalize.
    * - indirizzo web: il nome del sito, che dice piu' dell'ultimo pezzo del
    *   percorso ("example.com" invece di "index.html");
-   * - percorso: l'ultimo segmento; su una radice la lettera del disco ("D:").
+   * - percorso: l'ultimo segmento; sulla radice la barra ("/").
    */
   Store.pathLeaf = function (path) {
     var raw = String(path || '').trim();
@@ -158,9 +163,10 @@
       var host = raw.replace(URL_RE, '').split(/[\/?#]/)[0];
       return host.replace(/^www[.]/i, '') || raw;
     }
-    var clean = raw.replace(/[\\/]+$/, '');
-    if (!clean) return 'Collegamento';
-    var parts = clean.split(/[\\/]/);
+    var clean = raw.replace(/[/]+$/, '');
+    // Solo barre: e' la radice, e la radice si chiama cosi'.
+    if (!clean) return raw ? '/' : 'Collegamento';
+    var parts = clean.split('/');
     return parts[parts.length - 1] || clean;
   };
 

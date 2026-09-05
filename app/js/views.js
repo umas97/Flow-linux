@@ -752,7 +752,7 @@
           return V.linkCard(l, 'act');
         }).join('') + '</div>'
         : emptyState('folder', 'Nessun collegamento',
-          'Una cartella o un file sul disco si aprono nell’Esplora risorse, un indirizzo web nel browser.')) +
+          'Una cartella o un file sul disco si aprono nel gestore file, un indirizzo web nel browser.')) +
       '</section>' +
 
       '</div>';

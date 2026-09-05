@@ -686,7 +686,7 @@
           box.querySelector('[data-x="export"]').onclick = App.exportData;
           box.querySelector('[data-x="import"]').onclick = App.importData;
           box.querySelector('[data-x="reveal"]').onclick = function () {
-            if (Store.backend !== 'server') { App.toast('Disponibile solo avviando Flow.exe', 'alert'); return; }
+            if (Store.backend !== 'server') { App.toast('Disponibile solo avviando ./flow', 'alert'); return; }
             fetch('/api/reveal', { method: 'POST' }).catch(function () {});
           };
           box.querySelector('[data-x="reset"]').onclick = function () {
@@ -712,7 +712,7 @@
             }).catch(function () {});
           } else {
             U.$('#stPath', box).textContent = 'Archiviazione del browser (localStorage)';
-            U.$('#stWhere', box).textContent = 'Avvia “Flow.exe” per salvare su file';
+            U.$('#stWhere', box).textContent = 'Avvia “./flow” per salvare su file';
           }
         }
       }
@@ -1459,10 +1459,10 @@
 
   var LINK_COLORS = TAG_COLORS;
 
-  /** Senza host non c'e' nessun Esplora risorse da aprire. */
+  /** Senza host non c'e' nessun gestore file da aprire. */
   function needsHost() {
     if (Store.backend === 'server') return false;
-    App.toast('Disponibile solo avviando Flow.exe', 'alert');
+    App.toast('Disponibile solo avviando ./flow', 'alert');
     return true;
   }
 
@@ -1472,7 +1472,7 @@
   function guessKind(path) {
     var v = Store.cleanPath(path);
     if (Store.isUrl(v)) return 'url';
-    return /[.][A-Za-z0-9]{1,8}$/.test(v.replace(/[\\/]+$/, '')) ? 'file' : 'dir';
+    return /[.][A-Za-z0-9]{1,8}$/.test(v.replace(/[/]+$/, '')) ? 'file' : 'dir';
   }
 
   /* Tipo certo: lo dice l'host guardando il disco, perche' l'estensione sbaglia
@@ -1497,9 +1497,9 @@
 
   function openLink(l) {
     /* Un indirizzo web non passa dall'host: la finestra nuova e' intercettata
-       da NewWindowRequested, che apre il browser predefinito e non una finestra
-       di WebView2. Aprendo index.html in un browser normale e' una scheda,
-       quindi i collegamenti web funzionano anche senza Flow.exe. */
+       dal segnale "create" della WebView, che apre il browser predefinito e non
+       una finestra di WebKit. Aprendo index.html in un browser normale e' una
+       scheda, quindi i collegamenti web funzionano anche senza ./flow. */
     if (l.kind === 'url') {
       try { window.open(l.path, '_blank', 'noopener'); }
       catch (err) { App.toast('Non si apre: indirizzo non valido', 'alert'); }
@@ -1577,7 +1577,7 @@
       '<div class="modal-body">' +
       '<div class="field"><label>Percorso o indirizzo</label>' +
       '<input class="input mono" id="lkPath" spellcheck="false" ' +
-      'placeholder="C:\\Progetti\\Casa   oppure   https://esempio.it" value="' +
+      'placeholder="/home/utente/Progetti/Casa   oppure   https://esempio.it" value="' +
       (existing ? U.esc(existing.path) : '') + '">' +
       '<div class="hint">Un indirizzo web si incolla e basta: per quello non c\'e\' selettore.</div></div>' +
       '<div class="field"><div class="lk-browse">' +

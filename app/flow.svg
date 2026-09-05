@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="Flow">
+  <title>Flow</title>
+  <!-- Ridisegnata a mano dalla vecchia flow.ico: un solo SVG, nitido a ogni
+       dimensione, senza convertitori fra le dipendenze di install.sh. -->
+  <defs>
+    <linearGradient id="sfondo" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#8477ff"/>
+      <stop offset="1" stop-color="#5544ec"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="240" height="240" rx="58" fill="url(#sfondo)"/>
+  <path d="M72 133 L110 172 L186 90"
+        fill="none" stroke="#ffffff" stroke-width="26"
+        stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

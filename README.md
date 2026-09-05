@@ -1,42 +1,51 @@
-# Flow
+# Flow (Linux)
 
-Gestore di attività in stile Asana per Windows, **completamente locale**: nessun account,
-nessuna connessione, nessuna porta in ascolto, nessuna dipendenza da installare. Tutto
-l'archivio è un file JSON leggibile a mano, `data\board.json`.
+> Fork Linux di [FloppyO1/Flow](https://github.com/FloppyO1/Flow), portato da Windows
+> (WebView2 + WinForms) a Ubuntu 24.04 con un host GTK 3 + WebKitGTK.
+> La versione **Windows** resta disponibile qui: branch
+> [`windows`](../../tree/windows) e release
+> [`windows-final`](../../releases/tag/windows-final).
 
-Un eseguibile da 40 KB — compilato da **un solo file C#** — apre una finestra WebView2 e le
-serve l'interfaccia da dentro il proprio processo.
+Gestore di attività in stile Asana per Ubuntu, **completamente locale**: nessun account,
+nessuna connessione, nessuna porta in ascolto, nessuna dipendenza da compilare. Tutto
+l'archivio è un file JSON leggibile a mano, `data/board.json`.
+
+Un host di **un solo file Python** apre una finestra WebKitGTK e le serve l'interfaccia da
+dentro il proprio processo.
 
 > **Documentazione per l'utente: [GUIDA.md](GUIDA.md)** — viste, scorciatoie, inserimento
 > rapido, backup, portabilità. Questo file è la mappa per chi mette mano al codice.
 
 ---
 
-## Avvio e compilazione
+## Avvio
 
 ```
-Flow.exe            avvia l'app (doppio clic, o dalla shell)
-build.cmd           ricompila Flow.exe — serve solo dopo aver modificato src\Flow.cs
+./flow              avvia l'app
+./install.sh        registra la voce di menu e l'icona in ~/.local/share
+./uninstall.sh      le toglie (data/ non viene toccata)
 ```
 
-Non esiste nessuno step di build per il frontend: **nessun bundler, nessun linter, nessun
-test runner, nessun `package.json`**. Modificare qualcosa sotto `app\` ha effetto al
-riavvio di `Flow.exe` (le risposte partono con `Cache-Control: no-cache`). `F12` apre i
-DevTools; gli errori non gestiti della pagina e quelli dell'host finiscono in
-`data\flow.log`.
+Requisiti, tutti dai repository ufficiali di Ubuntu 24.04:
 
-`build.cmd` usa il `csc.exe` che Windows ha già dentro
-(`%SystemRoot%\Microsoft.NET\Framework64\v4.0.30319\csc.exe`): niente Visual Studio, niente
-SDK, niente NuGet. Referenzia le tre DLL di WebView2 in [lib/](lib/) e produce `Flow.exe`
-nella radice del repository. `Flow.exe.config` (`probing privatePath="lib"`) deve restare
-accanto all'eseguibile, altrimenti le DLL non vengono trovate.
+```
+sudo apt install python3-gi python3-gi-cairo gir1.2-gtk-3.0 gir1.2-webkit2-4.1
+```
 
-Requisiti a runtime: .NET Framework 4.x e il runtime WebView2 — entrambi già presenti su un
-Windows 10/11 aggiornato.
+`gir1.2-soup-3.0` arriva come dipendenza di `gir1.2-webkit2-4.1` e serve per le
+intestazioni delle risposte. Non c'è nient'altro da installare: **niente `pip`, niente
+ambienti virtuali, niente compilazione.** Se un binding manca, `src/flow.py` lo dice e
+stampa il comando `apt` esatto invece di fallire sull'import.
+
+Non esiste nessuno step di build, né per l'host né per il frontend: **nessun bundler,
+nessun linter, nessun test runner, nessun `package.json`**. Modificare qualcosa sotto
+`app/` — o dentro `src/flow.py` — ha effetto al riavvio di `./flow` (le risposte partono
+con `Cache-Control: no-cache`). `F12` apre l'ispettore WebKit; gli errori non gestiti della
+pagina e quelli dell'host finiscono in `data/flow.log`.
 
 Aprire [app/index.html](app/index.html) direttamente nel browser funziona: il frontend
-riconosce il protocollo `file:` e ripiega su `localStorage`. Comodo per lavorare sulla UI
-senza ricompilare, ma `/api/*` non è disponibile.
+riconosce il protocollo `file:` e ripiega su `localStorage`. Comodo per lavorare sulla UI,
+ma `/api/*` non è disponibile.
 
 ---
 
@@ -44,54 +53,64 @@ senza ricompilare, ma `/api/*` non è disponibile.
 
 ### Due metà, un processo
 
-[src/Flow.cs](src/Flow.cs) (1044 righe) non monta nulla: registra un filtro
-`WebResourceRequested` su `https://flow.example/*` e risponde a ogni richiesta in-process.
-[Flow.cs:552-621](src/Flow.cs#L552-L621) instrada `/api/*`, `ServeStatic` serve i file di
-`app\` (con guardia sul path traversal e tabella MIME).
+[src/flow.py](src/flow.py) non monta nulla: registra lo **schema URI `flow://`** su
+`WebKitWebContext` e risponde a ogni richiesta in-process. `_su_richiesta` instrada
+`/api/*`, `_servi_statico` serve i file di `app/` (con guardia sul path traversal e tabella
+MIME). La pagina vive su `flow://flow.example/index.html`.
 
-`SetVirtualHostNameToFolderMapping` **non** è usato di proposito: servirebbe i file da sé
-scavalcando l'handler, e `/api/*` non arriverebbe mai. Aggiungere una `fetch` dal frontend
-verso un endpoint nuovo richiede quindi un `case` nuovo in quello switch.
+Uno schema personalizzato e non `http` è la scelta che tiene in piedi l'invariante del
+progetto: **nessun socket, nessuna porta**. Il prezzo è che lo schema va dichiarato
+`secure` e `cors enabled` sul `WebKitSecurityManager`, altrimenti la pagina resta senza
+`localStorage` e il `fetch` verso `/api/` viene rifiutato.
+
+Le risposte usano `WebKitURISchemeResponse` con `finish_with_response()`: la vecchia
+`finish()` non permette di scegliere il codice di stato, e un 404 arriverebbe alla pagina
+come un 200. Aggiungere una `fetch` dal frontend verso un endpoint nuovo richiede quindi un
+ramo nuovo in `_su_richiesta`.
 
 | Endpoint | |
 |---|---|
 | `GET/PUT /api/data` | legge e scrive `board.json` |
-| `GET /api/info` | percorsi, numero e peso dei backup, versione di WebView2 |
-| `POST /api/reveal` | mostra `board.json` nell'Esplora risorse |
+| `GET /api/info` | percorsi, numero e peso dei backup, versione di WebKitGTK |
+| `POST /api/reveal` | mostra `board.json` nel gestore file |
 | `POST /api/pick` | dialogo nativo cartella/file |
 | `POST /api/kind` | cartella o file? lo chiede al disco |
-| `POST /api/open` | evidenzia un percorso nell'Esplora risorse |
-| `/api/quit`, `/api/health` | chiusura, ping |
+| `POST /api/open` | evidenzia un percorso nel gestore file |
+| `/api/quit`, `/api/health`, `/api/ping` | chiusura, ping |
 
 `/api/pick`, `/api/kind` e `/api/open` prendono un **corpo in testo semplice, non JSON**
-(`dir`/`file` e un percorso): in `Flow.cs` non c'è un parser JSON e una stringa sola non
-giustifica scriverne uno.
+(`dir`/`file` e un percorso): è una stringa sola, interpretarla come JSON non aggiungerebbe
+niente.
 
-`/api/pick` apre il dialogo nativo, quindi risponde solo dopo la scelta dell'utente: tiene
-la richiesta con `e.GetDeferral()` e mostra il dialogo da un `BeginInvoke` (un dialogo
-modale non si può aprire dentro l'event handler). `/api/kind` fa lo stesso e sposta
-`Directory.Exists`/`File.Exists` su un thread del pool — una condivisione di rete morta
-blocca per secondi, e questo codice gira sul thread della UI.
+`/api/pick` apre `Gtk.FileChooserNative` — che passa dal portal XDG, quindi ha l'aspetto e
+i permessi del gestore file di sistema e funziona su Wayland — e risponde solo dopo la
+scelta: la richiesta viene tenuta e `finish_with_response()` si chiama dal gestore del
+segnale `response`, perché un dialogo modale non si può aprire dentro il gestore della
+richiesta. `/api/kind` sposta lo `stat` su un `threading.Thread` e rientra sul ciclo
+principale con `GLib.idle_add` — una condivisione di rete morta blocca per secondi, e
+questo codice gira sul filo della finestra.
 
-`/api/open` si limita a **rivelare** un percorso (`explorer.exe "<dir>"` oppure
-`/select,"<file>"`), rifiuta tutto ciò che non sia un percorso rooted ed esistente, e
-**non fa mai** `Process.Start` sul file stesso. Decide cartella-o-file guardando il
-filesystem, mai dal `kind` memorizzato nel collegamento.
+`/api/open` si limita a **rivelare** un percorso: per un file chiama D-Bus
+`org.freedesktop.FileManager1.ShowItems`, che lo evidenzia davvero dentro la sua cartella
+come faceva `explorer.exe /select,`; per una cartella ne apre il contenuto con
+`Gio.AppInfo`. Rifiuta tutto ciò che non sia un percorso POSIX assoluto ed esistente, e
+**non esegue mai** il file. Decide cartella-o-file guardando il filesystem, mai dal `kind`
+memorizzato nel collegamento. `~` viene espanso qui, non nei dati salvati.
 
 ### Frontend: globali, nessun modulo
 
 Script semplici su `window`, caricati in ordine di dipendenza da
-[index.html](app/index.html#L106-L112) — cambiare l'ordine rompe l'avvio:
+[index.html](app/index.html#L107-L113) — cambiare l'ordine rompe l'avvio:
 
 | File | | Righe |
 |---|---|--:|
-| [icons.js](app/js/icons.js) | set di SVG in linea | 67 |
+| [icons.js](app/js/icons.js) | set di SVG in linea | 68 |
 | [util.js](app/js/util.js) | `U` — date, DOM, markdown minimale | 194 |
-| [store.js](app/js/store.js) | `Store` — stato, salvataggio, annulla/ripristina | 595 |
+| [store.js](app/js/store.js) | `Store` — stato, salvataggio, annulla/ripristina | 621 |
 | [parse.js](app/js/parse.js) | `Parse` — linguaggio naturale italiano | 181 |
-| [views.js](app/js/views.js) | `Views` — rendering delle viste | 773 |
-| [detail.js](app/js/detail.js) | `Menu`, `Modal`, `Detail` | 701 |
-| [app.js](app/js/app.js) | `App` — routing, eventi, drag & drop, scorciatoie | 2171 |
+| [views.js](app/js/views.js) | `Views` — rendering delle viste | 786 |
+| [detail.js](app/js/detail.js) | `Menu`, `Modal`, `Detail` | 741 |
+| [app.js](app/js/app.js) | `App` — routing, eventi, drag & drop, scorciatoie | 2188 |
 
 Ogni file è un IIFE `(function (global) { 'use strict'; … })(window)`.
 
@@ -107,7 +126,9 @@ Ogni file è un IIFE `(function (global) { 'use strict'; … })(window)`.
   `JSON.stringify(state, null, 2)`: indentato di proposito, `board.json` deve restare
   leggibile da un essere umano.
 - `Store.backend` vale `server` (servito dall'host), `local` (`file:` → localStorage) o
-  `memory` (host irraggiungibile: ripiega su localStorage e avvisa).
+  `memory` (host irraggiungibile: ripiega su localStorage e avvisa). Il riconoscimento a
+  [store.js:21](app/js/store.js#L21) accetta `flow:` oltre a `http:`/`https:`: senza quel
+  ramo l'app ripiegherebbe su localStorage pur avendo l'archivio su disco a disposizione.
 - `normalize()` gira a ogni caricamento, undo, redo e import: riempie i default e **ripara
   i riferimenti orfani** (un'attività che punta a un progetto/sezione inesistente viene
   riattaccata, gli id di etichette sconosciute vengono scartati). Undo e redo
@@ -115,22 +136,47 @@ Ogni file è un IIFE `(function (global) { 'use strict'; … })(window)`.
   un commit.
 
 **Cancello sul salvataggio:** l'host rifiuta di scrivere qualcosa che non sembri una
-board — `Accepts()` a [Flow.cs:811](src/Flow.cs#L811) pretende che il corpo grezzo contenga
+board — `accetta()` in [flow.py](src/flow.py) pretende che il corpo grezzo contenga
 `"tasks":[` **e** `"projects":[`. Rinominare una di quelle due chiavi di primo livello
 romperebbe in silenzio ogni salvataggio con un HTTP 400. Lo stesso controllo protegge la
 scrittura in chiusura.
 
-**Chiusura:** `OnFormClosing` annulla la chiusura, chiama `ExecuteScriptAsync` per leggere
-`window.Store.state` e lo rimanda indietro come messaggio web `flow:save:`; un timer di
-1,5 s forza la chiusura se la pagina non risponde. È così che si salvano gli ultimi 450 ms
-di modifiche, e dipende dal fatto che `Store` resti un globale con uno `state`
-serializzabile in JSON.
+**Chiusura:** `delete-event` annulla la chiusura, chiama `evaluate_javascript()` per
+leggere `window.Store.state` e lo rimanda indietro come messaggio
+`window.webkit.messageHandlers.flow` con prefisso `flow:save:`; un timer di 1,5 s forza la
+chiusura se la pagina non risponde. È così che si salvano gli ultimi 450 ms di modifiche, e
+dipende dal fatto che `Store` resti un globale con uno `state` serializzabile in JSON.
 
-**Backup** (`data\backups\`, al massimo 25 `board-*.json`, uno ogni 5 minuti, saltato se
+`navigator.sendBeacon` — l'altra rete di sicurezza del frontend — **non funziona su uno
+schema personalizzato** (WebKit lo consente solo su HTTP/S). Non è un problema perché la
+chiamata sta già dentro un `try`, e la garanzia anti-perdita è quella chiusura ritardata:
+ma non contarci più.
+
+**Attenzione al segnale dei messaggi:** in WebKit2 4.1 `script-message-received` porta un
+`WebKitJavascriptResult`, non il valore JavaScript. Il testo si legge con
+`risultato.get_js_value().to_string()`. Leggerlo un livello troppo in alto non solleva
+niente di visibile: i messaggi arrivano e vengono scartati in silenzio, e ci si accorge
+solo che la chiusura non salva più e che gli errori di pagina non compaiono nel log.
+
+**Backup** (`data/backups/`, al massimo 25 `board-*.json`, uno ogni 5 minuti, saltato se
 identico al più recente): la soglia dei 5 minuti è letta all'avvio dall'mtime del file più
 recente, non tenuta in memoria, perché il processo esce ogni volta che la finestra si
-chiude. Un `board.json` illeggibile viene copiato in `illeggibile-*.json` (max 5) invece di
-essere sovrascritto.
+chiude. La copia salta se identica ma **la soglia si azzera lo stesso**. Un `board.json`
+illeggibile viene copiato in `illeggibile-*.json` (max 5) invece di essere sovrascritto. La
+scrittura è atomica: file temporaneo, `flush` + `fsync`, `os.replace()`.
+
+### Finestra
+
+`Gtk.Application` con `application-id` `it.flow.Flow` fa da lucchetto via D-Bus: un secondo
+avvio non apre una seconda finestra, arriva come `activate` e chiama `present()`. Lo stesso
+id deve combaciare con il nome del file `.desktop` scritto da `install.sh`, altrimenti
+GNOME non collega la finestra alla voce di menu e mostra l'icona generica.
+
+`data/.window` conserva `x,y,larghezza,altezza,massimizzata`. Su Wayland **le coordinate si
+salvano ma non si applicano**: una finestra non decide dove mettersi, e non c'è nessun ramo
+X11 di riserva. La dimensione da non massimizzati si misura con 200 ms di ritardo, perché
+massimizzando il ridimensionamento arriva *prima* che la finestra si dichiari massimizzata:
+leggendo subito si salverebbe la dimensione a tutto schermo come se fosse quella normale.
 
 ### Rendering
 
@@ -147,10 +193,9 @@ JS: misurare `scrollHeight` subito dopo l'`innerHTML` cadeva in mezzo all'animaz
 `field-sizing`, e lì aspetta che la larghezza del pannello smetta di cambiare.
 
 Tutta l'interazione è delega di eventi su `document`, con chiave negli attributi data:
-`data-act` per la shell ([app.js:835](app/js/app.js#L835)) e `data-d` dentro il pannello
-dettagli ([detail.js:347](app/js/detail.js#L347)). UI nuova = emetti l'attributo, aggiungi
-un `case`. `data-task` marca i trascinabili, `data-drop` una zona di rilascio, `data-day`
-una cella del calendario.
+`data-act` per la shell e `data-d` dentro il pannello dettagli. UI nuova = emetti
+l'attributo, aggiungi un `case`. `data-task` marca i trascinabili, `data-drop` una zona di
+rilascio, `data-day` una cella del calendario.
 
 La vista corrente sta in `location.hash` (`#today`, `#p/<id>`) così avanti e indietro della
 finestra funzionano; è specchiata in `localStorage['flow.route']` per l'avvio successivo.
@@ -160,11 +205,17 @@ finestra funzionano; è specchiata in `localStorage['flow.route']` per l'avvio s
 ## Convenzioni che contano
 
 - **Italiano.** Ogni commento, stringa della UI, etichetta di commit e messaggio di log è
-  in italiano. Va tenuto così.
+  in italiano — nell'host Python come nel frontend. Va tenuto così.
+- **Solo la standard library e PyGObject.** `src/flow.py` non importa niente che non sia
+  già su una Ubuntu 24.04 con i quattro pacchetti sopra. Nessun `pip`, nessun `requirements.txt`.
 - **Sintassi ES5, DOM moderno.** `var`, function expression, nessuna arrow function,
-  template literal o classe in tutto `app\js\`. `fetch`, `closest`, `dataset`,
-  `Object.assign` e `color-mix()` sono usati liberamente: il runtime è sempre
-  Edge/WebView2 aggiornato.
+  template literal o classe in tutto `app/js/`. `fetch`, `closest`, `dataset`,
+  `Object.assign` e `color-mix()` sono usati liberamente: il runtime è sempre WebKitGTK
+  aggiornato.
+- **Percorsi POSIX e basta.** Separatore `/`, radice `/`, assoluti che iniziano con `/`.
+  Un archivio arrivato da una macchina Windows mostrerà i suoi collegamenti come non
+  validi: **non riscrivere mai i dati esistenti** per rimediare — un percorso non
+  risolvibile resta salvato e produce un messaggio d'errore, non viene cancellato.
 - **Le date sono stringhe**, mai oggetti `Date` nello stato: chiavi in ora locale
   `"YYYY-MM-DD"` via `U.toKey` / `U.fromKey` / `U.addDays` / `U.diffDays`.
 - **L'ordinamento è frazionario.** Attività e sezioni portano un `order` numerico
@@ -178,7 +229,8 @@ finestra funzionano; è specchiata in `localStorage['flow.route']` per l'avvio s
   [app/styles.css](app/styles.css). Lo script inline in
   [index.html](app/index.html#L9-L21) rilegge `localStorage['flow.prefs']` prima del primo
   paint per evitare un lampeggio: ogni impostazione nuova che influenza il primo paint va
-  rispecchiata lì **e** in `Store.savePrefs()`.
+  rispecchiata lì **e** in `Store.savePrefs()`. Il tema «Auto» segue GNOME: WebKitGTK mappa
+  `prefers-color-scheme` sulle impostazioni di sistema.
 - **Schede dei progetti.** `project.view` è uno fra `board` / `list` / `calendar` /
   `notes` (l'elenco con icone ed etichette è `Views.PROJECT_VIEWS`, usato da topbar,
   impostazioni e scorciatoie `1`-`4`), validato in `normalize()`: un valore sconosciuto
@@ -192,9 +244,9 @@ finestra funzionano; è specchiata in `localStorage['flow.route']` per l'avvio s
   `kind` e `path` nei due versi: un percorso `http(s)://` è sempre `url`, e un `kind`
   `url` su un percorso su disco viene declassato — altrimenti `/api/open` proverebbe un
   indirizzo web come percorso del filesystem. I percorsi passano da `Store.cleanPath`
-  (trim + rimozione delle virgolette che aggiunge "Copia come percorso"). Un collegamento
-  `url` non tocca mai l'host: `window.open` viene intercettato da `NewWindowRequested`,
-  che lo passa al browser predefinito.
+  (trim + rimozione delle virgolette che si porta dietro un percorso copiato da un
+  terminale). Un collegamento `url` non tocca mai l'host: `window.open` viene intercettato
+  dal segnale `create` della WebView, che lo passa al browser predefinito.
 - **Gli stessi collegamenti stanno sulle attività**: `task.links` / `task.linksSort`,
   identici a quelli di un progetto e ripuliti dalla stessa `normalizeLinks()`. Non
   esiste una seconda copia dell'interfaccia: finestra, menu, ordinamento e riquadri
@@ -218,19 +270,17 @@ finestra funzionano; è specchiata in `localStorage['flow.route']` per l'avvio s
 ## Struttura
 
 ```
-Flow.exe            l'applicazione (versionata: vedi la nota sotto)
-Flow.exe.config     probing privatePath="lib", deve stare accanto all'exe
-build.cmd           ricompila Flow.exe
-lib\                le tre librerie di WebView2
-src\
-  Flow.cs           host: finestra, file serviti, /api/*, salvataggio, backup
-  Flow.manifest     permessi e DPI awareness
-app\
+flow                script di avvio: risolve la propria cartella ed esegue l'host
+install.sh          scrive il .desktop e copia l'icona in ~/.local/share
+uninstall.sh        li rimuove, senza toccare data/
+src/
+  flow.py           host: finestra, file serviti, /api/*, salvataggio, backup
+app/
   index.html        struttura della pagina + script anti-lampeggio del tema
   styles.css        token dei temi e componenti
-  flow.ico          icona
-  js\               icons, util, store, parse, views, detail, app
-data\               archivio dell'utente, creato al primo avvio (gitignored)
+  flow.svg          icona, un solo SVG scalabile
+  js/               icons, util, store, parse, views, detail, app
+data/               archivio dell'utente, creato al primo avvio (gitignored)
 GUIDA.md            documentazione per l'utente finale
 CLAUDE.md           istruzioni per Claude Code
 ```
@@ -239,19 +289,20 @@ CLAUDE.md           istruzioni per Claude Code
 
 ## Note sul repository
 
-- **`data\` è l'archivio vivo dell'utente** — `board.json`, `backups\`, `flow.log`,
-  `.window` e la cache di WebView2. Tutto quello che sta lì dentro è gitignored tranne
-  `.gitkeep`, e la cartella viene ricreata dall'app: un clone fresco ha `data\` vuota, e
-  al primo avvio `seed()` in [store.js](app/js/store.js) scrive `board.json`. **Non
-  riscrivere `board.json` né svuotare `backups\` come parte di una modifica al codice**:
-  su una copia di lavoro quello è l'archivio reale di qualcuno.
-- **`Flow.exe` è versionato**, quindi una modifica a `src\Flow.cs` non è utilizzabile
-  finché `build.cmd` non è girato — e un commit che tocca `src\` deve portarsi dietro
-  l'exe ricompilato, altrimenti su GitHub finisce un binario che non corrisponde al suo
-  sorgente.
-- Il vecchio percorso di avvio (un server Node `http` su 127.0.0.1, un launcher `.vbs`,
-  un `.lnk`) e gli zip rilasciati sotto `dist\` sono stati rimossi nella fase 10. La
-  logica di storage in `Flow.cs` è una traduzione diretta del `server.js` di allora; se
-  serve rivedere l'originale è nella storia: `git show db0942b:vecchio-avvio-server/server.js`.
+- **`data/` è l'archivio vivo dell'utente** — `board.json`, `backups/`, `flow.log`,
+  `.window` e la cache del motore in `.webkit`. Tutto quello che sta lì dentro è
+  gitignored, e la cartella se la crea l'app: un clone fresco non ha `data/` affatto, e al
+  primo avvio `seed()` in [store.js](app/js/store.js) scrive `board.json`.
+  **Non riscrivere `board.json` né svuotare `backups/` come parte di una modifica al
+  codice**: su una copia di lavoro quello è l'archivio reale di qualcuno.
+- **Niente binari versionati.** L'host è sorgente Python eseguito così com'è: una modifica
+  a `src/flow.py` è utilizzabile al riavvio, non c'è nessun artefatto da rigenerare e
+  nessun commit da tenere allineato a un eseguibile.
+- **Solo Linux.** Il supporto Windows (`Flow.cs` con WebView2 e WinForms, `build.cmd`,
+  `lib/`, `Flow.exe`) è stato rimosso portando l'app su Ubuntu; la logica di archiviazione
+  di `flow.py` è una traduzione diretta di quel `Flow.cs`, che a sua volta traduceva un
+  vecchio `server.js`. Se serve rivedere gli originali sono nella storia del repository.
+- **Bersaglio dichiarato: GNOME su Wayland, Ubuntu 24.04.** Non ci sono rami condizionali
+  per X11, KDE o altri gestori file: dove serve basta il ripiego generico su `Gio.AppInfo`.
 - [GUIDA.md](GUIDA.md) è documentazione per l'utente finale in italiano e fa da specifica
   per scorciatoie, viste e regole dei backup: va aggiornata quando se ne cambia una.

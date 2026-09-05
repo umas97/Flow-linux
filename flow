@@ -1,0 +1,16 @@
+#!/bin/sh
+# Flow — avvio.
+#
+# Risolve la propria cartella prima di tutto: l'host cerca app/ e data/
+# accanto a sé, e la voce di menu lancia questo script da una cartella di
+# lavoro qualsiasi.
+
+qui=$(dirname "$(readlink -f "$0")")
+
+if ! command -v python3 >/dev/null 2>&1; then
+    echo "Flow non può partire: manca python3." >&2
+    echo "Si installa con:  sudo apt install python3" >&2
+    exit 1
+fi
+
+exec python3 "$qui/src/flow.py" "$@"
