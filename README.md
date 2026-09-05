@@ -256,10 +256,32 @@ finestra funzionano; è specchiata in `localStorage['flow.route']` per l'avvio s
   ricevono il nome dell'attributo di delega, `act` nel guscio e `d` dentro `#detail`.
   Chi muta un elenco chiama `Store.touch(o)`: aggiorna `updatedAt` se chi possiede i
   collegamenti ce l'ha (un'attività sì, un progetto no).
-- **Una sola tavolozza.** `COLORS` (24) e `EMOJIS` (48) in cima ad
+- **Una sola tavolozza.** `PALETTE` (24 righe) e `EMOJIS` (48) in cima ad
   [app.js](app/js/app.js) sono l'unica fonte per progetti, etichette, collegamenti e
-  colore principale. C'erano quattro array copiati da dodici colori che divergevano a ogni
-  modifica: non reintrodurre un literal locale.
+  colore principale; `COLORS` sono i soli valori chiari di `PALETTE`. C'erano quattro
+  array copiati da dodici colori che divergevano a ogni modifica: non reintrodurre un
+  literal locale, nemmeno in `store.js` (`ensureTag` / `ensurePerson` passano da
+  `U.farColor()`).
+  **Un colore non viene mai assegnato in automatico scorrendo la tavolozza in
+  ordine**: 24 tinte a 15 gradi l'una dall'altra, di seguito, sembrano la stessa.
+  `U.farColor(usati)` riceve i colori già assegnati e restituisce la tinta la cui
+  *più vicina* fra quelle in uso è la più lontana possibile, a sorte fra le
+  candidate a pari distanza. La chiamano in quattro: il dialogo di nuovo progetto
+  (che preseleziona quel campione invece di `COLORS[0]`), `ensureTag`,
+  `ensurePerson` e `linkModal`, ognuno passando i colori dei suoi pari.
+  Ogni riga è una tinta in due varianti: `chiaro` è **il valore memorizzato in
+  `board.json`** — l'identità del colore, che non dipende dal tema — `scuro` è la
+  stessa tinta resa sul fondo scuro e `testo` è il colore leggibile sopra il pieno
+  chiaro (sopra quello scuro è sempre `#1A1A1A`); tutte le coppie superano il
+  contrasto WCAG AA. `U.tint(hex)` e `U.tintText(hex)` scelgono la variante del tema
+  in corso: **un colore memorizzato non finisce mai direttamente in uno `style`
+  inline**, chi scrive `--pc`/`--tc`/`--lc`/`--ac`/`--c` passa da `U.tint`, e
+  `--accent`/`--accent-fg` li imposta `applyTheme()` (per il primo paint li rispecchia
+  `savePrefs` in `accentScuro`/`accentTesto`, che legge lo script inline di
+  `index.html`). Siccome quei valori sono scritti dentro l'HTML, cambiare tema
+  ridisegna tutto. `normalize()` riporta in tavolozza con `U.snap` un colore che non
+  c'è, prendendo la tinta più vicina: è così che rientra un archivio salvato da una
+  versione precedente.
 - **Inserimento rapido** ([app/js/parse.js](app/js/parse.js)) interpreta l'italiano
   naturale: date (`oggi`, `ven`, `tra 3 giorni`, `12/03`, `12 marzo`), `!alta`, `#tag`,
   `@persona`, `+progetto`. Etichette e persone citate lì vengono create al volo da

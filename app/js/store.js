@@ -55,18 +55,18 @@
     return {
       schema: SCHEMA,
       createdAt: n,
-      settings: { theme: 'system', accent: '#6d5efc', density: 'comfortable', startView: 'today' },
+      settings: { theme: 'system', accent: '#294AAE', density: 'comfortable', startView: 'today' },
       people: [
-        { id: 'me', name: 'Io', color: '#6d5efc' }
+        { id: 'me', name: 'Io', color: '#294AAE' }
       ],
       tags: [
-        { id: 'tg_urgente', name: 'urgente', color: '#ef4444' },
-        { id: 'tg_idea', name: 'idea', color: '#f59e0b' },
-        { id: 'tg_casa', name: 'casa', color: '#10b981' }
+        { id: 'tg_urgente', name: 'urgente', color: '#AE2929' },
+        { id: 'tg_idea', name: 'idea', color: '#AE8C29' },
+        { id: 'tg_casa', name: 'casa', color: '#29AE6B' }
       ],
       projects: [
         {
-          id: pid, name: 'Benvenuto in Flow', color: '#6d5efc', icon: '🚀',
+          id: pid, name: 'Benvenuto in Flow', color: '#294AAE', icon: '🚀',
           archived: false, view: 'board', order: 1000, createdAt: n,
           sections: [
             { id: s1, name: 'Da fare', order: 1000 },
@@ -75,7 +75,7 @@
           ]
         },
         {
-          id: pid2, name: 'Casa', color: '#10b981', icon: '🏡',
+          id: pid2, name: 'Casa', color: '#29AE6B', icon: '🏡',
           archived: false, view: 'list', order: 2000, createdAt: n,
           sections: [
             { id: 's_casa1', name: 'Questa settimana', order: 1000 },
@@ -203,11 +203,16 @@
           id: l.id || U.uid('l'),
           path: path,
           label: l.label || Store.pathLeaf(path),
-          color: l.color || fallback,
+          color: U.snap(l.color || fallback, COLORE),
           kind: kind
         };
       });
   }
+
+  /* Colore predefinito: Indaco, la sedicesima tinta della tavolozza in
+     app.js. Ogni colore memorizzato viene da li' — uno fuori tavolozza
+     (archivio scritto da una versione precedente) rientra con U.snap. */
+  var COLORE = '#294AAE';
 
   function normalize(data) {
     var d = data && typeof data === 'object' ? data : {};
@@ -215,10 +220,11 @@
 
     d.schema = SCHEMA;
     d.settings = Object.assign({
-      theme: 'system', accent: '#6d5efc', density: 'comfortable',
+      theme: 'system', accent: COLORE, density: 'comfortable',
       startView: 'today', sidebarCollapsed: false, detailWidth: 440, detailAutoHide: true,
       projectsLocked: true, rememberProjectView: true, defaultProjectView: 'board'
     }, d.settings || {});
+    d.settings.accent = U.snap(d.settings.accent, COLORE);
     // Larghezza del pannello dettagli: numero entro i limiti della maniglia.
     var dw = +d.settings.detailWidth;
     d.settings.detailWidth = isNaN(dw) ? 440 : Math.max(320, Math.min(720, Math.round(dw)));
@@ -254,7 +260,7 @@
     d.projects.forEach(function (p) {
       p.id = p.id || U.uid('p');
       p.name = p.name || 'Progetto';
-      p.color = p.color || '#6d5efc';
+      p.color = U.snap(p.color, COLORE);
       p.sections = Array.isArray(p.sections) && p.sections.length ? p.sections : [{ id: U.uid('s'), name: 'Da fare', order: 1000 }];
       p.sections.forEach(function (s, i) {
         s.id = s.id || U.uid('s');
@@ -301,7 +307,14 @@
     });
 
     var tagIds = {};
-    d.tags.forEach(function (g) { g.id = g.id || U.uid('tg'); tagIds[g.id] = true; });
+    // Colori delle persone: come le etichette, sempre dalle 24 in tavolozza.
+    d.people.forEach(function (p) { p.color = U.snap(p.color, COLORE); });
+
+    d.tags.forEach(function (g) {
+      g.id = g.id || U.uid('tg');
+      g.color = U.snap(g.color, COLORE);
+      tagIds[g.id] = true;
+    });
     d.tasks.forEach(function (t) {
       t.tags = t.tags.filter(function (id) { return tagIds[id]; });
     });
@@ -319,7 +332,15 @@
     var s = Store.state && Store.state.settings;
     if (!s) return;
     try {
-      localStorage.setItem(LS_PREFS, JSON.stringify({ theme: s.theme, accent: s.accent, density: s.density }));
+      // Lo script inline di index.html applica il tema prima del primo paint
+      // e non conosce la tavolozza: la coppia dell'accento gli arriva gia'
+      // risolta (sopra il pieno scuro il testo e' sempre #1A1A1A).
+      var pal = U.paletteOf(s.accent);
+      localStorage.setItem(LS_PREFS, JSON.stringify({
+        theme: s.theme, accent: s.accent, density: s.density,
+        accentScuro: pal ? pal.scuro : s.accent,
+        accentTesto: pal ? pal.testo : '#fff'
+      }));
     } catch (e) {}
   }
 
@@ -590,13 +611,20 @@
     if (i >= 0) Store.state.tasks.splice(i, 1);
   };
 
+  /** I colori gia' assegnati in una lista, per U.farColor. */
+  function coloriDi(list) {
+    return list.map(function (x) { return x.color; });
+  }
+
   Store.ensureTag = function (name) {
     var clean = String(name).trim().toLowerCase().replace(/^#/, '');
     if (!clean) return null;
     var found = Store.state.tags.filter(function (g) { return g.name.toLowerCase() === clean; })[0];
     if (found) return found;
-    var palette = ['#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
-    var tag = { id: U.uid('tg'), name: clean, color: palette[Store.state.tags.length % palette.length] };
+    // Colore dalla tavolozza unica (app.js), il piu' lontano dalle etichette
+    // che ci sono gia': a giro sulla ruota due etichette create di seguito
+    // distavano quindici gradi, cioe' sembravano lo stesso colore.
+    var tag = { id: U.uid('tg'), name: clean, color: U.farColor(coloriDi(Store.state.tags)) };
     Store.state.tags.push(tag);
     return tag;
   };
@@ -608,7 +636,10 @@
       return p.name.toLowerCase() === clean.toLowerCase();
     })[0];
     if (found) return found;
-    var person = { id: U.uid('pe'), name: clean, color: 'hsl(' + U.hashHue(clean) + ' 65% 55%)' };
+    // Tinta della tavolozza piu' lontana da quelle delle altre persone: la
+    // derivava dal nome, ma un hash non sa niente di chi c'e' gia' e finiva
+    // spesso sul vicino di ruota di qualcun altro.
+    var person = { id: U.uid('pe'), name: clean, color: U.farColor(coloriDi(Store.state.people)) };
     Store.state.people.push(person);
     return person;
   };

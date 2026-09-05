@@ -229,10 +229,35 @@ work; it is mirrored into `localStorage['flow.route']` for the next launch.
   `Views.linkSortBtn(o, at)` take the name of the delegation attribute (`act` in the
   shell, `d` inside `#detail`). Whoever mutates a list calls `Store.touch(o)`, which
   bumps `updatedAt` only if the owner has one (a task does, a project doesn't).
-- **One palette.** `COLORS` (24) and `EMOJIS` (48) at the top of
+- **One palette.** `PALETTE` (24 rows) and `EMOJIS` (48) at the top of
   [app.js](app/js/app.js) are the single source for projects, tags, links and the
-  accent colour. There used to be four copied twelve-colour arrays that drifted
-  apart on every edit — don't reintroduce a local literal.
+  accent colour; `COLORS` is just `PALETTE`'s light values. There used to be four
+  copied twelve-colour arrays that drifted apart on every edit — don't reintroduce
+  a local literal, and don't hard-code a hex in `store.js` either (`ensureTag` /
+  `ensurePerson` go through `U.farColor()`).
+  **A colour is never auto-assigned by walking the palette in order** — 24 hues
+  15° apart mean consecutive entries look identical. `U.farColor(used)` takes the
+  colours already assigned and returns the palette hue whose *nearest* used hue is
+  farthest away, picking at random among ties (so two archives don't come out the
+  same, and a deleted colour is reused). Its four callers pass the peers of what
+  they are creating: `Store.state.projects` for the new-project dialog (which
+  preselects that swatch instead of `COLORS[0]`), `state.tags`, `state.people`, and
+  the owner's `links` in `linkModal`. Non-palette or grey values in `used` have no
+  hue and are ignored.
+  Every row is one hue in two variants: `chiaro` is **the value stored in
+  `board.json`** — the colour's identity, theme-independent — `scuro` is how that
+  same hue is drawn under the dark theme, and `testo` is the readable text over the
+  light fill (over the dark one it is always `#1A1A1A`); all pairs clear WCAG AA.
+  `U.setPalette` registers the table and `U.tint(hex)` / `U.tintText(hex)` pick the
+  variant for the current theme: **never emit a stored colour straight into an
+  inline `style`** — everything that writes `--pc`/`--tc`/`--lc`/`--ac`/`--c` goes
+  through `U.tint`, and `--accent`/`--accent-fg` are set in `applyTheme()` (mirrored
+  for the first paint by `savePrefs` → `accentScuro`/`accentTesto` → the inline
+  script in `index.html`). Because those hexes are baked into the HTML, changing
+  theme re-renders (`App.setTheme` and the `prefers-color-scheme` listener).
+  `normalize()` snaps any colour outside the palette to the nearest hue with
+  `U.snap` — that is what converts an archive written by an older version, and it
+  is the reason a hand-written hex will not survive a reload.
 - **Quick add** ([app/js/parse.js](app/js/parse.js)) parses Italian natural language:
   dates (`oggi`, `ven`, `tra 3 giorni`, `12/03`, `12 marzo`), `!alta`, `#tag`, `@person`,
   `+project`. Tags and people named there are created on the fly by `Store.ensureTag` /

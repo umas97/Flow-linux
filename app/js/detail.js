@@ -92,7 +92,7 @@
       // non si chiude se ci si clicca sopra.
       if (it.disabled) b.disabled = true;
       b.innerHTML = (it.ic ? icon(it.ic) : it.color
-        ? '<span class="proj-dot" style="--pc:' + it.color + '"></span>'
+        ? '<span class="proj-dot" style="--pc:' + U.tint(it.color) + '"></span>'
         : it.emoji ? '<span class="proj-emoji">' + U.esc(it.emoji) + '</span>' : '') +
         '<span class="sp">' + U.esc(it.label) + '</span>' +
         (it.on ? icon('check', 'sm') : '') + (it.right || '');
@@ -312,7 +312,7 @@
       field('folder', 'Progetto',
         '<button class="dt-set" data-d="project">' +
         (p ? (p.icon ? '<span class="proj-emoji">' + U.esc(p.icon) + '</span>'
-          : '<span class="proj-dot" style="--pc:' + p.color + '"></span>') + U.esc(p.name) : 'Nessuno') + '</button>') +
+          : '<span class="proj-dot" style="--pc:' + U.tint(p.color) + '"></span>') + U.esc(p.name) : 'Nessuno') + '</button>') +
       field('board', 'Sezione',
         '<button class="dt-set" data-d="section">' + (s ? U.esc(s.name) : '—') + '</button>') +
       field('calendar', 'Scadenza',
@@ -327,7 +327,7 @@
       field('tag', 'Etichette',
         t.tags.map(function (id) {
           var g = Store.tag(id);
-          return g ? '<span class="pill tag" style="--tc:' + g.color + '">' + U.esc(g.name) +
+          return g ? '<span class="pill tag" style="--tc:' + U.tint(g.color) + '">' + U.esc(g.name) +
             '<button data-d="untag" data-id="' + g.id + '" style="margin-left:2px;color:inherit;opacity:.6">' + icon('x', 'sm') + '</button></span>' : '';
         }).join('') + '<button class="dt-set empty-v" data-d="tags">' + icon('plus', 'sm') + 'Aggiungi</button>') +
       '</div>' +

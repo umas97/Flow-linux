@@ -140,11 +140,122 @@
     return ((p[0] || '')[0] || '?').toUpperCase() + (p.length > 1 ? (p[p.length - 1][0] || '').toUpperCase() : '');
   }
 
-  /** Colore stabile derivato da una stringa (per avatar / etichette). */
-  function hashHue(s) {
-    var h = 0;
-    for (var i = 0; i < String(s).length; i++) h = (h * 31 + String(s).charCodeAt(i)) % 360;
-    return h;
+  /* ---------- tavolozza ---------- */
+
+  /* L'archivio memorizza sempre la variante chiara del colore: è l'identità
+     della tinta e non cambia con il tema. Qui si sceglie come disegnarla —
+     a tema scuro la variante piu' chiara, che sul fondo scuro resta leggibile
+     senza abbagliare. La tabella arriva da PALETTE in app.js, che resta
+     l'unica sorgente dei colori; un colore che non e' in tavolozza (archivio
+     vecchio, valore scritto a mano) passa cosi' com'e'. */
+  var PALETTE = {}, INDICE = {}, ORDINE = [];
+
+  function setPalette(list) {
+    PALETTE = {}; INDICE = {}; ORDINE = [];
+    list.forEach(function (c, i) {
+      PALETTE[c.chiaro.toUpperCase()] = c;
+      INDICE[c.chiaro.toUpperCase()] = i;
+      ORDINE.push(c.chiaro);
+    });
+  }
+
+  function tema() { return document.documentElement.dataset.theme === 'dark'; }
+
+  /** I 24 valori memorizzabili, nell'ordine della ruota cromatica. */
+  function colors() {
+    return ORDINE.slice();
+  }
+
+  /* Il colore da proporre a qualcosa di nuovo (progetto, etichetta, persona,
+     collegamento): fra le 24 tinte quella piu' lontana da quelle gia' in uso —
+     si misura la distanza dalla piu' vicina delle esistenti, sulla ruota
+     cromatica, e vince chi ce l'ha piu' grande. Con un solo progetto rosso il
+     secondo esce azzurro, il terzo verde o fucsia; a parita' di distanza
+     sceglie a caso fra le candidate, cosi' due archivi non nascono uguali e i
+     colori restano distinti anche dopo una cancellazione. Prendere invece la
+     tavolozza in ordine dava tinte a 15 gradi l'una dall'altra, cioe' tutte
+     uguali a occhio. 'usati' e' una lista di colori memorizzati: quelli fuori
+     tavolozza o grigi non hanno tonalita' e vengono ignorati. */
+  function farColor(usati) {
+    if (!ORDINE.length) return null;
+    var toni = (usati || []).map(hue).filter(function (h) { return h != null; });
+    if (!toni.length) return pick(ORDINE);
+    var migliori = [], massimo = -1;
+    ORDINE.forEach(function (c) {
+      var h = hue(c), minima = 360;
+      toni.forEach(function (t) {
+        var d = Math.abs(h - t);
+        if (d > 180) d = 360 - d;
+        if (d < minima) minima = d;
+      });
+      // Mezzo grado di tolleranza: le tonalita' arrivano da un calcolo in
+      // virgola mobile, un pareggio non deve dipendere dall'arrotondamento.
+      if (minima > massimo + 0.5) { massimo = minima; migliori = [c]; }
+      else if (minima > massimo - 0.5) migliori.push(c);
+    });
+    return pick(migliori);
+  }
+
+  function hex2rgb(c) {
+    var m = /^#([0-9a-f]{6})$/i.exec(String(c).trim());
+    if (!m) return null;
+    var v = parseInt(m[1], 16);
+    return [(v >> 16) & 255, (v >> 8) & 255, v & 255];
+  }
+
+  /** Tonalita' 0-359 di un colore esadecimale, null se e' un grigio. */
+  function hue(c) {
+    var hsl = /^hsl\(\s*(-?[\d.]+)/.exec(String(c));
+    if (hsl) return ((+hsl[1] % 360) + 360) % 360;
+    var r = hex2rgb(c);
+    if (!r) return null;
+    var mx = Math.max(r[0], r[1], r[2]), mn = Math.min(r[0], r[1], r[2]);
+    if (mx === mn) return null;
+    var d = mx - mn, h;
+    if (mx === r[0]) h = ((r[1] - r[2]) / d) % 6;
+    else if (mx === r[1]) h = (r[2] - r[0]) / d + 2;
+    else h = (r[0] - r[1]) / d + 4;
+    h = h * 60;
+    return h < 0 ? h + 360 : h;
+  }
+
+  /* Riporta in tavolozza un colore che non c'e' (archivio scritto con la
+     palette precedente, o valore messo a mano): tiene la tonalita' e prende
+     la tinta piu' vicina fra le 24. Un grigio o un valore illeggibile non ha
+     tonalita' da conservare e diventa il colore predefinito. */
+  function snap(c, fallback) {
+    if (inPalette(c)) return ORDINE[INDICE[String(c).toUpperCase()]];
+    var h = hue(c);
+    if (h == null) return fallback || ORDINE[0];
+    var best = ORDINE[0], dist = 999;
+    ORDINE.forEach(function (v) {
+      var d = Math.abs(hue(v) - h);
+      if (d > 180) d = 360 - d;
+      if (d < dist) { dist = d; best = v; }
+    });
+    return best;
+  }
+
+  function inPalette(c) {
+    return c ? PALETTE[String(c).toUpperCase()] : null;
+  }
+
+  /** La riga di tavolozza di un colore memorizzato, null se non c'e'. */
+  function paletteOf(c) {
+    return inPalette(c) || null;
+  }
+
+  /** Il colore da disegnare per il tema in corso. */
+  function tint(c) {
+    var v = inPalette(c);
+    return v && tema() ? v.scuro : c;
+  }
+
+  /** Il testo leggibile sopra un pieno di quel colore. */
+  function tintText(c) {
+    var v = inPalette(c);
+    if (!v) return '#fff';
+    return tema() ? '#1A1A1A' : v.testo;
   }
 
   /* ---------- DOM ---------- */
@@ -188,7 +299,9 @@
     uid: uid, toKey: toKey, fromKey: fromKey, today: today, addDays: addDays, diffDays: diffDays,
     humanDate: humanDate, longDate: longDate, startOfWeek: startOfWeek, relativeTime: relativeTime,
     MONTHS: MONTHS, MONTHS_SHORT: MONTHS_SHORT, DAYS: DAYS, DAYS_SHORT: DAYS_SHORT,
-    esc: esc, miniMarkdown: miniMarkdown, initials: initials, hashHue: hashHue, bytes: bytes,
-    $: $, $$: $$, el: el, debounce: debounce, pick: pick, orderBetween: orderBetween
+    esc: esc, miniMarkdown: miniMarkdown, initials: initials, bytes: bytes,
+    $: $, $$: $$, el: el, debounce: debounce, pick: pick, orderBetween: orderBetween,
+    setPalette: setPalette, tint: tint, tintText: tintText, colors: colors, snap: snap,
+    paletteOf: paletteOf, farColor: farColor
   };
 })(window);

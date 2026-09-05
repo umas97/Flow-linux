@@ -30,12 +30,43 @@
    * 24 colori = quattro righe da sei nella griglia .swatches.
    * ================================================================== */
 
-  var COLORS = [
-    '#FF0000', '#00FF6B', '#00BCFF', '#FF0095', '#FFF400', '#00F2FF',
-    '#6B00FF', '#FF7000', '#00FFAE', '#00A7FF', '#FF006D', '#CCFF00',
-    '#00DFFF', '#EA00FF', '#FF9D00', '#00FFD7', '#008CFF', '#FF0045',
-    '#72FF00', '#00CEFF', '#FF00C6', '#FFC500', '#00FFF4', '#005FFF'
+  /* Ventiquattro tinte, una ogni 15 gradi sulla ruota cromatica, in due
+     varianti: 'chiaro' è il valore memorizzato nell'archivio — l'identità del
+     colore, quella che finisce in board.json — e 'scuro' è la sua resa a tema
+     scuro, stesso hue e sola luminosità cambiata. 'testo' è il colore
+     leggibile sopra il pieno chiaro (sopra quello scuro è sempre #1A1A1A):
+     tutte le coppie superano il contrasto WCAG AA 4.5:1.
+     Sceglie la variante U.tint(), non chi disegna: nell'archivio resta
+     sempre e solo il valore chiaro. */
+  var PALETTE = [
+    { nome: 'Rosso',         chiaro: '#AE2929', scuro: '#E17070', testo: '#FFFFFF' },
+    { nome: 'Corallo',       chiaro: '#AE4A29', scuro: '#E18C70', testo: '#FFFFFF' },
+    { nome: 'Arancio',       chiaro: '#9D6125', scuro: '#E1A870', testo: '#FFFFFF' },
+    { nome: 'Ambra',         chiaro: '#AE8C29', scuro: '#E1C470', testo: '#1A1A1A' },
+    { nome: 'Oro',           chiaro: '#AEAE29', scuro: '#E1E170', testo: '#1A1A1A' },
+    { nome: 'Lime oro',      chiaro: '#8CAE29', scuro: '#C4E170', testo: '#1A1A1A' },
+    { nome: 'Lime',          chiaro: '#6BAE29', scuro: '#A8E170', testo: '#1A1A1A' },
+    { nome: 'Verde prato',   chiaro: '#4AAE29', scuro: '#8CE170', testo: '#1A1A1A' },
+    { nome: 'Smeraldo',      chiaro: '#29AE29', scuro: '#70E170', testo: '#1A1A1A' },
+    { nome: 'Verde menta',   chiaro: '#29AE4A', scuro: '#70E18C', testo: '#1A1A1A' },
+    { nome: 'Teal',          chiaro: '#29AE6B', scuro: '#70E1A8', testo: '#1A1A1A' },
+    { nome: 'Ciano',         chiaro: '#29AE8C', scuro: '#70E1C4', testo: '#1A1A1A' },
+    { nome: 'Azzurro',       chiaro: '#29AEAE', scuro: '#70E1E1', testo: '#1A1A1A' },
+    { nome: 'Blu cielo',     chiaro: '#298CAE', scuro: '#70C4E1', testo: '#1A1A1A' },
+    { nome: 'Blu',           chiaro: '#296BAE', scuro: '#70A8E1', testo: '#FFFFFF' },
+    { nome: 'Indaco',        chiaro: '#294AAE', scuro: '#708CE1', testo: '#FFFFFF' },
+    { nome: 'Viola',         chiaro: '#2929AE', scuro: '#8181E4', testo: '#FFFFFF' },
+    { nome: 'Ametista',      chiaro: '#4A29AE', scuro: '#8C70E1', testo: '#FFFFFF' },
+    { nome: 'Magenta',       chiaro: '#6B29AE', scuro: '#A870E1', testo: '#FFFFFF' },
+    { nome: 'Orchidea',      chiaro: '#8C29AE', scuro: '#C470E1', testo: '#FFFFFF' },
+    { nome: 'Fucsia',        chiaro: '#AE29AE', scuro: '#E170E1', testo: '#FFFFFF' },
+    { nome: 'Rosa',          chiaro: '#AE298C', scuro: '#E170C4', testo: '#FFFFFF' },
+    { nome: 'Rosa corallo',  chiaro: '#AE296B', scuro: '#E170A8', testo: '#FFFFFF' },
+    { nome: 'Rosso mattone', chiaro: '#AE294A', scuro: '#E1708C', testo: '#FFFFFF' }
   ];
+
+  var COLORS = PALETTE.map(function (c) { return c.chiaro; });
+  U.setPalette(PALETTE);
 
   // 48 icone = quattro righe da dodici. Raggruppate per ambito, cosi' si
   // trovano a occhio: lavoro, casa, studio, tempo libero, viaggi, simboli.
@@ -208,17 +239,23 @@
     var s = Store.state.settings;
     var dark = s.theme === 'dark' || (s.theme === 'system' && mq.matches);
     document.documentElement.dataset.theme = dark ? 'dark' : 'light';
-    document.documentElement.style.setProperty('--accent', s.accent);
+    // L'archivio tiene la variante chiara: a schermo la tinta giusta per il
+    // tema la sceglie U.tint, e con lei il testo leggibile sopra il pieno.
+    document.documentElement.style.setProperty('--accent', U.tint(s.accent));
+    document.documentElement.style.setProperty('--accent-fg', U.tintText(s.accent));
     document.documentElement.dataset.density = s.density === 'compact' ? 'compact' : '';
   }
+  /* Il tema non cambia solo le variabili CSS: i colori dei progetti, delle
+     etichette e dei collegamenti finiscono negli attributi style scritti a
+     mano, quindi vanno riscritti con la variante dell'altro tema. */
   mq.addEventListener('change', function () {
-    if (Store.state && Store.state.settings.theme === 'system') applyTheme();
+    if (Store.state && Store.state.settings.theme === 'system') { applyTheme(); App.render(); }
   });
 
   App.setTheme = function (t) {
     Store.quiet(function (st) { st.settings.theme = t; });
     applyTheme();
-    Views.sidebar();
+    App.render();
   };
 
   /* ================================================================== *
@@ -267,6 +304,10 @@
 
   App.newProject = function () {
     var colors = COLORS, emojis = EMOJIS;
+    // Colore proposto: il piu' lontano da quelli dei progetti che ci sono
+    // gia' (archiviati compresi, restano nella barra laterale). Era sempre il
+    // primo della tavolozza, quindi nascevano tutti rossi.
+    var suggerito = U.farColor(Store.state.projects.map(function (p) { return p.color; }));
     Modal.open(
       '<div class="modal-head"><h2>Nuovo progetto</h2></div>' +
       '<div class="modal-body">' +
@@ -277,15 +318,15 @@
           e + '</button>';
       }).join('') + '</div></div>' +
       '<div class="field"><label>Colore</label><div class="swatches" id="npColor">' +
-      colors.map(function (c, i) {
-        return '<button class="swatch' + (i === 0 ? ' on' : '') + '" data-c="' + c + '" style="--c:' + c + '"></button>';
+      colors.map(function (c) {
+        return '<button class="swatch' + (c === suggerito ? ' on' : '') + '" data-c="' + c + '" style="--c:' + U.tint(c) + '"></button>';
       }).join('') + '</div></div>' +
       '</div>' +
       '<div class="modal-foot"><button class="btn" data-x="cancel">Annulla</button>' +
       '<button class="btn primary" data-x="create">Crea progetto</button></div>',
       {
         onMount: function (box) {
-          var color = colors[0], emoji = '';
+          var color = suggerito, emoji = '';
           U.$('#npColor', box).onclick = function (e) {
             var b = e.target.closest('[data-c]'); if (!b) return;
             color = b.dataset.c;
@@ -344,7 +385,7 @@
       return Store.state.tags.map(function (g) {
         var n = tagUsage(g.id);
         return '<div class="tag-row" data-id="' + g.id + '">' +
-          '<button class="tag-swatch" data-x="color" style="--c:' + g.color + '" title="Cambia colore"></button>' +
+          '<button class="tag-swatch" data-x="color" style="--c:' + U.tint(g.color) + '" title="Cambia colore"></button>' +
           '<input class="tag-name" value="' + U.esc(g.name) + '" maxlength="24" spellcheck="false">' +
           '<span class="tag-use">' + (n ? n + ' attività' : 'non usata') + '</span>' +
           '<button class="icon-btn" data-x="del" title="Elimina etichetta">' + icon('trash', 'sm') + '</button>' +
@@ -385,7 +426,7 @@
           width: 200,
           html: '<div class="menu-head">Colore</div><div class="swatches">' +
             TAG_COLORS.map(function (c) {
-              return '<button class="swatch' + (c === g.color ? ' on' : '') + '" data-c="' + c + '" style="--c:' + c + '"></button>';
+              return '<button class="swatch' + (c === g.color ? ' on' : '') + '" data-c="' + c + '" style="--c:' + U.tint(c) + '"></button>';
             }).join('') + '</div>'
         });
         m.addEventListener('click', function (ev) {
@@ -496,7 +537,7 @@
             var p = Store.project(chosenProject);
             projBtn.innerHTML = p
               ? (p.icon ? '<span class="proj-emoji">' + U.esc(p.icon) + '</span>'
-                : '<span class="proj-dot" style="--pc:' + p.color + '"></span>') + U.esc(p.name)
+                : '<span class="proj-dot" style="--pc:' + U.tint(p.color) + '"></span>') + U.esc(p.name)
               : 'Progetto';
           }
           projBtn.onclick = function () {
@@ -517,7 +558,7 @@
             if (r.priority) out.push('<span class="pill prio-' + r.priority + '">' + icon('flag') + Views.PRIO_NAME[r.priority] + '</span>');
             r.tags.forEach(function (name) {
               var g = Store.state.tags.filter(function (x) { return x.name === name; })[0];
-              out.push('<span class="pill tag" style="--tc:' + (g ? g.color : 'var(--accent)') + '">' + U.esc(name) +
+              out.push('<span class="pill tag" style="--tc:' + (g ? U.tint(g.color) : 'var(--accent)') + '">' + U.esc(name) +
                 (g ? '' : ' <span style="opacity:.6">nuova</span>') + '</span>');
             });
             r.assignees.forEach(function (name) {
@@ -579,7 +620,7 @@
       '<div class="ds">Tinta di accento dell\'interfaccia</div></div></div>' +
       '<div class="swatches" id="stColor" style="padding:0 0 12px">' +
       colors.map(function (c) {
-        return '<button class="swatch' + (c === s.accent ? ' on' : '') + '" data-c="' + c + '" style="--c:' + c + '"></button>';
+        return '<button class="swatch' + (c === s.accent ? ' on' : '') + '" data-c="' + c + '" style="--c:' + U.tint(c) + '"></button>';
       }).join('') + '</div>' +
 
       '<div class="set-row"><div class="sp"><div class="nm">Densità</div>' +
@@ -1373,7 +1414,7 @@
       alignRight: true,
       html: '<div class="menu-head">Colore</div><div class="swatches">' +
         colors.map(function (c) {
-          return '<button class="swatch' + (c === p.color ? ' on' : '') + '" data-pc="' + c + '" style="--c:' + c + '"></button>';
+          return '<button class="swatch' + (c === p.color ? ' on' : '') + '" data-pc="' + c + '" style="--c:' + U.tint(c) + '"></button>';
         }).join('') + '</div><div class="menu-sep"></div>'
     });
 
@@ -1560,9 +1601,11 @@
    * Il percorso si mette in tre modi: selettore nativo, incolla, o a mano.
    */
   function linkModal(o, existing) {
-    // Colore a caso e non quello del progetto: in una lista dove i collegamenti
-    // hanno tutti lo stesso colore non si distingue niente a occhio.
-    var color = (existing && existing.color) || U.pick(LINK_COLORS);
+    // Colore non quello del progetto — in una lista dove i collegamenti hanno
+    // tutti la stessa tinta non si distingue niente a occhio — ma nemmeno a
+    // caso: il piu' lontano da quelli degli altri collegamenti di qui.
+    var color = (existing && existing.color) ||
+      U.farColor(((o && o.links) || []).map(function (l) { return l.color; }));
     var kind = (existing && existing.kind) || 'dir';
     // L'etichetta segue il percorso finche' non la si scrive a mano; su un
     // collegamento che esiste gia' e' roba dell'utente e non si tocca.
@@ -1594,7 +1637,7 @@
       (existing ? U.esc(existing.label) : '') + '"></div>' +
       '<div class="field"><label>Colore</label><div class="swatches" id="lkColor">' +
       LINK_COLORS.map(function (c) {
-        return '<button class="swatch' + (c === color ? ' on' : '') + '" data-c="' + c + '" style="--c:' + c + '"></button>';
+        return '<button class="swatch' + (c === color ? ' on' : '') + '" data-c="' + c + '" style="--c:' + U.tint(c) + '"></button>';
       }).join('') + '</div></div>' +
       '</div>' +
       '<div class="modal-foot">' +
@@ -1747,7 +1790,38 @@
    * TRASCINAMENTO
    * ================================================================== */
 
-  var drag = { id: null, projId: null, line: null, zone: null, afterId: null };
+  var drag = { id: null, projId: null, line: null, zone: null, afterId: null, ghost: null };
+
+  /* WebKitGTK disegna l'anteprima del trascinamento alla risoluzione del
+     monitor ma poi la mostra in pixel logici: su uno schermo HiDPI (scala 2,
+     il caso normale su GNOME) la card presa appare grande il doppio. Gliene
+     passiamo una nostra: un clone fuori schermo rimpicciolito di
+     devicePixelRatio, così lo snapshot torna delle dimensioni giuste. Lo
+     "zoom" e non "transform: scale" perché l'anteprima nasce da un rendering
+     del riquadro di layout, che una trasformazione non cambia. */
+  function ghostImage(e, node) {
+    var dpr = window.devicePixelRatio || 1;
+    if (dpr <= 1 || !e.dataTransfer.setDragImage) return;
+    var r = node.getBoundingClientRect();
+    if (!r.width || !r.height) return;
+    var copia = node.cloneNode(true);
+    copia.classList.remove('dragging');
+    copia.removeAttribute('draggable');
+    copia.style.width = r.width + 'px';
+    copia.style.margin = '0';
+    copia.style.animation = 'none';
+    // Il contenitore ripete tag e classi del genitore (un <li> della barra
+    // laterale fuori dalla sua <ul> perderebbe tutto lo stile).
+    var padre = node.parentNode;
+    var host = document.createElement(padre && padre.tagName ? padre.tagName : 'div');
+    host.className = 'drag-ghost ' + (padre && padre.className ? padre.className : '');
+    host.style.zoom = 1 / dpr;
+    host.appendChild(copia);
+    document.body.appendChild(host);
+    drag.ghost = host;
+    // Le coordinate del punto di presa sono nello spazio del clone, già ridotto.
+    e.dataTransfer.setDragImage(host, (e.clientX - r.left) / dpr, (e.clientY - r.top) / dpr);
+  }
 
   document.addEventListener('dragstart', function (e) {
     // Progetti della barra laterale: il <li> porta data-projdrag solo a
@@ -1758,6 +1832,7 @@
       drag.id = null; drag.zone = null; drag.afterId = null;
       pnode.classList.add('dragging');
       document.body.classList.add('is-dragging-proj');
+      ghostImage(e, pnode);
       e.dataTransfer.effectAllowed = 'move';
       try { e.dataTransfer.setData('text/plain', drag.projId); } catch (err) {}
       return;
@@ -1771,6 +1846,7 @@
     node.classList.add('dragging');
     // Serve al CSS per mostrare il riquadro tratteggiato delle sezioni vuote.
     document.body.classList.add('is-dragging');
+    ghostImage(e, node);
     e.dataTransfer.effectAllowed = 'move';
     try { e.dataTransfer.setData('text/plain', drag.id); } catch (err) {}
   });
@@ -1781,6 +1857,7 @@
     U.$$('.dragging').forEach(function (n) { n.classList.remove('dragging'); });
     U.$$('.drop-active').forEach(function (n) { n.classList.remove('drop-active'); });
     if (drag.line) { drag.line.remove(); drag.line = null; }
+    if (drag.ghost) { drag.ghost.remove(); drag.ghost = null; }
     drag.id = null; drag.projId = null; drag.zone = null; drag.afterId = null;
     document.body.classList.remove('is-dragging');
     document.body.classList.remove('is-dragging-proj');

@@ -191,9 +191,9 @@ parte: restano scritti, e cliccandoli Flow dice che il percorso non esiste. Li
 puoi correggere a mano, uno per uno — nessun dato viene toccato al posto tuo.
 
 L'etichetta è preimpostata col nome dell'ultima cartella, o col nome del sito per
-un indirizzo web. Il colore di un collegamento nuovo è preso a caso dalla
-tavolozza, così una lista di collegamenti si distingue a occhio: si cambia con un
-clic sulla pastiglia. Il pulsante `…` su un collegamento apre *Modifica*,
+un indirizzo web. Il colore di un collegamento nuovo è la tinta più lontana da
+quelle degli altri collegamenti già presenti, così una lista si distingue a
+occhio: si cambia con un clic sulla pastiglia. Il pulsante `…` su un collegamento apre *Modifica*,
 *Copia percorso* e *Rimuovi*.
 
 Con più di un collegamento compare il selettore d'ordine accanto al contatore:
@@ -229,6 +229,17 @@ mentre digiti un nome che non esiste ancora.
 Tema chiaro, scuro o automatico (segue GNOME), colore principale scelto fra 24
 tinte, densità comoda o compatta, barra laterale comprimibile. Progetti ed etichette
 prendono i colori dalla stessa tavolozza, e un progetto può avere una fra 48 icone.
+Le 24 tinte coprono la ruota cromatica a intervalli regolari e hanno due varianti,
+una per il tema chiaro e una per quello scuro: il colore scelto resta lo stesso e
+cambia solo la resa, così resta leggibile in entrambi i temi. Quando Flow propone
+un colore da solo — un progetto nuovo, un'etichetta o una persona nominata
+nell'inserimento rapido, un collegamento — non prende la tinta successiva della
+tavolozza ma quella più lontana da quelle già in uso: due progetti sono agli
+antipodi della ruota, tre a 120 gradi l'uno dall'altro, e non capita di ritrovarsi
+con cinque sfumature dello stesso rosso. Resta comunque una proposta: il colore si
+sceglie a mano fra tutte e 24. Un archivio salvato
+da una versione precedente di Flow, con i colori vecchi, viene riportato in
+tavolozza sulla tinta più vicina alla prima apertura.
 Annulla e ripristina illimitati sulla sessione (`Ctrl+Z` / `Ctrl+Shift+Z`).
 
 Il **pannello dei dettagli** si affianca al contenuto invece di coprirlo: il suo

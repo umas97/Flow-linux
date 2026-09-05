@@ -59,7 +59,7 @@
     return t.tags.slice(0, max || 3).map(function (id) {
       var g = Store.tag(id);
       if (!g) return '';
-      return '<span class="pill tag" style="--tc:' + g.color + '">' + U.esc(g.name) + '</span>';
+      return '<span class="pill tag" style="--tc:' + U.tint(g.color) + '">' + U.esc(g.name) + '</span>';
     }).join('');
   }
 
@@ -79,14 +79,14 @@
   function avatar(personId, cls) {
     var p = Store.person(personId);
     if (!p) return '';
-    return '<span class="avatar' + (cls ? ' ' + cls : '') + '" style="--ac:' + p.color + '" title="' + U.esc(p.name) + '">' +
+    return '<span class="avatar' + (cls ? ' ' + cls : '') + '" style="--ac:' + U.tint(p.color) + ';--act:' + U.tintText(p.color) + '" title="' + U.esc(p.name) + '">' +
       U.esc(U.initials(p.name)) + '</span>';
   }
 
   function projTag(t) {
     var p = Store.project(t.projectId);
     if (!p) return '';
-    return '<span class="row-proj"><span class="proj-dot" style="--pc:' + p.color + '"></span>' + U.esc(p.name) + '</span>';
+    return '<span class="row-proj"><span class="proj-dot" style="--pc:' + U.tint(p.color) + '"></span>' + U.esc(p.name) + '</span>';
   }
 
   V.card = function (t) {
@@ -229,10 +229,10 @@
       var circ = 2 * Math.PI * 6;
       return '<li' + (unlocked ? ' draggable="true" data-projdrag="' + p.id + '"' : '') + '>' +
         '<button class="proj-item' + (active ? ' active' : '') + '" data-act="nav" data-route="project" data-id="' + p.id + '" ' +
-        'data-ctx="project" style="--pc:' + p.color + '">' +
+        'data-ctx="project" style="--pc:' + U.tint(p.color) + '">' +
         (unlocked ? '<span class="proj-grip">' + icon('grip', 'sm') + '</span>' : '') +
         (p.icon ? '<span class="proj-emoji">' + U.esc(p.icon) + '</span>'
-          : '<span class="proj-dot" style="--pc:' + p.color + '"></span>') +
+          : '<span class="proj-dot" style="--pc:' + U.tint(p.color) + '"></span>') +
         '<span class="nav-label">' + U.esc(p.name) + '</span>' +
         '<svg class="ring" viewBox="0 0 16 16"><circle class="bg" cx="8" cy="8" r="6"></circle>' +
         '<circle class="fg" cx="8" cy="8" r="6" stroke-dasharray="' + circ.toFixed(1) + '" ' +
@@ -254,7 +254,7 @@
     });
     U.$('#tagList').innerHTML = Store.state.tags.map(function (g) {
       var on = App.ui.filters.tags.indexOf(g.id) >= 0;
-      return '<li><button class="tag-chip' + (on ? ' active' : '') + '" style="--tc:' + g.color + '" ' +
+      return '<li><button class="tag-chip' + (on ? ' active' : '') + '" style="--tc:' + U.tint(g.color) + ';--tct:' + U.tintText(g.color) + '" ' +
         'data-act="toggle-tag" data-id="' + g.id + '">' + U.esc(g.name) +
         (counts[g.id] ? '<span class="cnt">' + counts[g.id] + '</span>' : '') + '</button></li>';
     }).join('') || '<li style="padding:2px 2px;font-size:12px;color:var(--text-3)">Le etichette compaiono qui</li>';
@@ -300,7 +300,7 @@
       var pr = Store.progress(p.id);
       left = '<div class="tb-title">' +
         (p.icon ? '<span class="proj-emoji" style="font-size:19px" data-act="project-icon">' + U.esc(p.icon) + '</span>'
-          : '<span class="proj-dot" style="--pc:' + p.color + ';width:11px;height:11px"></span>') +
+          : '<span class="proj-dot" style="--pc:' + U.tint(p.color) + ';width:11px;height:11px"></span>') +
         '<input class="ttl" value="' + U.esc(p.name) + '" data-act="rename-project">' +
         '</div>' +
         '<span class="tb-sub">' + pr.done + '/' + pr.total + ' completate</span>';
@@ -441,7 +441,7 @@
         shown.map(function (t) {
           var pr = Store.project(t.projectId);
           return '<div class="cal-task' + (t.done ? ' done' : '') + '" draggable="true" data-task="' + t.id + '" ' +
-            'data-act="open-task" data-id="' + t.id + '" style="--pc:' + (pr ? pr.color : 'var(--accent)') + '" ' +
+            'data-act="open-task" data-id="' + t.id + '" style="--pc:' + (pr ? U.tint(pr.color) : 'var(--accent)') + '" ' +
             'title="' + U.esc(t.title) + '">' + U.esc(t.title) + '</div>';
         }).join('') +
         (list.length > 3 ? '<div class="cal-more">+' + (list.length - 3) + ' altre</div>' : '') +
@@ -536,8 +536,8 @@
 
     var projects = Store.activeProjects().map(function (p) {
       var pr = Store.progress(p.id);
-      return '<button class="proj-prog" data-act="nav" data-route="project" data-id="' + p.id + '" style="--pc:' + p.color + ';width:100%">' +
-        (p.icon ? '<span class="proj-emoji">' + U.esc(p.icon) + '</span>' : '<span class="proj-dot" style="--pc:' + p.color + '"></span>') +
+      return '<button class="proj-prog" data-act="nav" data-route="project" data-id="' + p.id + '" style="--pc:' + U.tint(p.color) + ';width:100%">' +
+        (p.icon ? '<span class="proj-emoji">' + U.esc(p.icon) + '</span>' : '<span class="proj-dot" style="--pc:' + U.tint(p.color) + '"></span>') +
         '<span class="nm">' + U.esc(p.name) + '</span>' +
         '<span class="bar"><i style="width:' + Math.round(pr.ratio * 100) + '%"></i></span>' +
         '<span class="pct">' + Math.round(pr.ratio * 100) + '%</span></button>';
@@ -630,7 +630,7 @@
       return '<section class="list-section">' +
         '<div class="list-sec-head">' +
         (g.icon ? '<span class="proj-emoji">' + U.esc(g.icon) + '</span>'
-          : g.color ? '<span class="proj-dot" style="--pc:' + g.color + '"></span>' : '') +
+          : g.color ? '<span class="proj-dot" style="--pc:' + U.tint(g.color) + '"></span>' : '') +
         '<h3' + (g.hot ? ' style="color:var(--p3)"' : '') + '>' + U.esc(g.title) + '</h3>' +
         '<span class="col-count">' + g.list.length + '</span></div>' +
         g.list.map(function (t) { return V.row(t, { showProject: !g.color }); }).join('') +
@@ -708,7 +708,7 @@
   V.linkCard = function (l, at) {
     var info = V.kindInfo(l.kind);
     return '<div class="link-card" data-' + at + '="open-link" ' +
-      'data-id="' + l.id + '" style="--lc:' + l.color + '" ' +
+      'data-id="' + l.id + '" style="--lc:' + U.tint(l.color) + '" ' +
       'title="' + U.esc(info.label) + ' · ' + U.esc(l.path) + '">' +
       '<span class="lk-ic">' + icon(info.ic) + '</span>' +
       '<span class="lk-body"><span class="lk-label">' + U.esc(l.label) + '</span>' +

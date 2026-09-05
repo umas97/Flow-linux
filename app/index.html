@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Flow</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%236d5efc'/%3E%3Cpath d='M9 16.5l5 5 9-10' stroke='white' stroke-width='3.2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23294AAE'/%3E%3Cpath d='M9 16.5l5 5 9-10' stroke='white' stroke-width='3.2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="styles.css">
 <script>
   // Applica il tema prima del primo paint: niente flash bianco all'avvio.
@@ -14,7 +14,11 @@
       var t = s.theme || 'system';
       var dark = t === 'dark' || (t === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
       document.documentElement.dataset.theme = dark ? 'dark' : 'light';
-      if (s.accent) document.documentElement.style.setProperty('--accent', s.accent);
+      if (s.accent) {
+        var st = document.documentElement.style;
+        st.setProperty('--accent', dark && s.accentScuro ? s.accentScuro : s.accent);
+        st.setProperty('--accent-fg', dark ? '#1A1A1A' : (s.accentTesto || '#fff'));
+      }
       if (s.density === 'compact') document.documentElement.dataset.density = 'compact';
     } catch (e) {}
   })();
